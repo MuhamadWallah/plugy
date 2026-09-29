@@ -72,7 +72,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
         body: JSON.stringify({ phone: trimmedPhone }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || 'Server error sending verification code');
+      }
 
       if (!res.ok) {
         throw new Error(data.error || 'Failed to send one-time password');
@@ -82,7 +89,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
       setOtpSent(true);
       setOtpVerified(false);
       setCooldownSeconds(60);
-      setSuccessNotice(`One-time password sent to ${trimmedPhone}. Check your messages.`);
+      setSuccessNotice(`One-time password dispatched for ${trimmedPhone}.`);
 
       if (data.devOtp) {
         setDevOtpCode(data.devOtp);
@@ -112,7 +119,14 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
         body: JSON.stringify({ phone: phone.trim(), otp: code }),
       });
 
-      const data = await res.json();
+      let data: any = {};
+      const contentType = res.headers.get('content-type') || '';
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        throw new Error(text || 'Failed to verify code');
+      }
 
       if (!res.ok) {
         throw new Error(data.error || 'Invalid verification code');
@@ -120,7 +134,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
 
       sound.playChime();
       setOtpVerified(true);
-      setSuccessNotice('Phone number verified successfully! You may now complete registration.');
+      setSuccessNotice('Phone number verified successfully! You can now complete registration.');
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : 'Verification failed');
     } finally {
@@ -336,10 +350,13 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
                 type="button"
                 onClick={handleSendOtp}
                 disabled={sendingOtp || cooldownSeconds > 0 || !phone.trim() || otpVerified}
-                className="px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
+                className="px-3.5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white border border-slate-700 font-bold text-xs transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed whitespace-nowrap shrink-0 flex items-center gap-1.5"
               >
                 {sendingOtp ? (
-                  <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                  <>
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                    <span>Sending...</span>
+                  </>
                 ) : cooldownSeconds > 0 ? (
                   `Resend in ${cooldownSeconds}s`
                 ) : otpSent ? (
@@ -350,12 +367,58 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
               </button>
             </div>
 
+            {/* Simulated SMS Dispatch Card (Sandbox / Local Dev Mode) */}
+            {otpSent && devOtpCode && !otpVerified && (
+              <div className="p-3.5 rounded-2xl bg-amber-500/10 border-2 border-amber-500/30 text-amber-200 space-y-2.5 animate-in slide-in-from-top-2 duration-200">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-amber-500"></span>
+                    </span>
+                    <span className="text-[11px] font-black text-amber-300 uppercase tracking-wider">
+                      📱 Simulated SMS Dispatch
+                    </span>
+                  </div>
+                  <span className="text-[10px] text-amber-400/90 font-mono font-bold bg-amber-500/20 px-2 py-0.5 rounded-full">
+                    Sandbox Mode
+                  </span>
+                </div>
+
+                <div className="bg-slate-900/95 rounded-xl p-3 border border-amber-500/20 text-xs">
+                  <div className="text-[11px] text-slate-400 mb-1 flex items-center justify-between">
+                    <span>SMS to: <span className="font-mono text-white font-bold">{phone}</span></span>
+                    <span className="text-slate-500 text-[10px]">Expires in 10m</span>
+                  </div>
+                  <div className="text-slate-200 font-medium">
+                    Your verification code is:
+                    <span className="ml-2 font-mono font-black text-amber-300 text-lg tracking-widest bg-slate-950 px-2.5 py-0.5 rounded-lg border border-amber-500/30 inline-block shadow-sm">
+                      {devOtpCode}
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={handleApplyDevOtp}
+                  className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-500 to-emerald-500 hover:from-amber-400 hover:to-emerald-400 text-slate-950 font-black text-xs shadow-lg flex items-center justify-center gap-2 cursor-pointer transition hover:scale-[1.01] active:scale-98"
+                >
+                  <CheckCircle2 className="w-4 h-4 stroke-[2.5]" />
+                  <span>Auto-Fill Code ({devOtpCode}) & Verify</span>
+                </button>
+
+                <p className="text-[10px] text-slate-400 leading-tight">
+                  💡 In local development, the OTP code is displayed right here and logged to the server terminal. To deliver real SMS to cellular phones, add Twilio API credentials to <code className="text-amber-300">.env</code>.
+                </p>
+              </div>
+            )}
+
             {/* OTP Code Entry Section (Appears after clicking Send OTP) */}
             {otpSent && (
               <div className="space-y-2.5 pt-2 border-t border-slate-800/80 animate-in fade-in duration-150">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1">
-                    <KeyRound className="w-3 h-3 text-amber-400" />
+                  <span className="text-[11px] font-bold text-slate-300 flex items-center gap-1.5">
+                    <KeyRound className="w-3.5 h-3.5 text-amber-400" />
                     Enter 6-Digit OTP Code
                   </span>
 
@@ -365,7 +428,7 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
                       onClick={handleApplyDevOtp}
                       className="text-[10px] font-bold text-emerald-400 hover:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded-lg border border-emerald-500/20 cursor-pointer"
                     >
-                      Fill Demo: {devOtpCode}
+                      Fill: {devOtpCode}
                     </button>
                   )}
                 </div>
@@ -376,31 +439,45 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
                     inputMode="numeric"
                     pattern="[0-9]*"
                     maxLength={6}
+                    disabled={otpVerified}
                     value={otp}
                     onChange={handleOtpChange}
                     placeholder="123456"
-                    className="flex-1 px-4 py-2 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-center text-sm font-mono tracking-widest text-white placeholder-slate-600 outline-none transition"
+                    className="flex-1 px-4 py-2.5 rounded-xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-center text-base font-mono font-bold tracking-widest text-white placeholder-slate-600 outline-none transition disabled:opacity-75"
                   />
 
                   <button
                     type="button"
                     onClick={() => handleVerifyOtp()}
                     disabled={verifyingOtp || otp.length !== 6 || otpVerified}
-                    className={`px-4 py-2 rounded-xl font-bold text-xs transition cursor-pointer shrink-0 ${
+                    className={`px-4 py-2.5 rounded-xl font-bold text-xs transition cursor-pointer shrink-0 flex items-center gap-1.5 ${
                       otpVerified
                         ? 'bg-emerald-500 text-slate-950 font-black'
                         : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 disabled:opacity-40'
                     }`}
                   >
                     {verifyingOtp ? (
-                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      <>
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                        <span>Checking...</span>
+                      </>
                     ) : otpVerified ? (
-                      'Verified ✓'
+                      <>
+                        <CheckCircle2 className="w-3.5 h-3.5" />
+                        <span>Verified ✓</span>
+                      </>
                     ) : (
                       'Verify'
                     )}
                   </button>
                 </div>
+
+                {otpVerified && (
+                  <div className="p-2.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in">
+                    <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span className="font-bold">Phone number verified! Ready to complete registration.</span>
+                  </div>
+                )}
               </div>
             )}
           </div>
