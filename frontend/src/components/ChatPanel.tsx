@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Send, MessageSquare, RefreshCw, AlertCircle, Sparkles, CheckCheck } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { sound } from '../utils/sound';
 
 export interface ChatMessage {
   id: string;
@@ -44,6 +45,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const isPoster = user?.id === posterId;
   const otherPartyName = isPoster ? (workerName || 'Worker') : posterName;
+
+  const quickReplies = isPoster
+    ? ['What is your ETA?', 'Cleaning supplies are in the hall closet.', 'Looks fantastic, thank you!']
+    : ['I am on my way now!', 'Arrived at the location.', 'Finished the job, please review!'];
 
   const scrollToBottom = useCallback((smooth = true) => {
     if (messagesEndRef.current) {
@@ -93,8 +98,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 
     const handleNewMessage = (newMessage: ChatMessage) => {
       if (newMessage.job_id === jobId) {
+        sound.playMessagePop();
         setMessages((prev) => {
-          // Avoid duplicate messages if already present
           if (prev.some((m) => m.id === newMessage.id)) {
             return prev;
           }
@@ -112,9 +117,10 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     };
   }, [socket, jobId, scrollToBottom]);
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = inputBody.trim();
+  const handleSendMessage = async (e?: React.FormEvent, customText?: string) => {
+    if (e) e.preventDefault();
+    const textToSend = customText !== undefined ? customText : inputBody;
+    const trimmed = textToSend.trim();
     if (!trimmed || sending) return;
 
     setSending(true);
@@ -136,6 +142,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       }
 
       const data = await res.json();
+      sound.playTap();
+
       // Optimistically append if not already received from socket
       if (data.message) {
         setMessages((prev) => {
@@ -166,35 +174,38 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   };
 
   return (
-    <div className="flex flex-col h-full bg-slate-950/80 rounded-2xl border border-slate-800 overflow-hidden shadow-inner">
+    <div className="flex flex-col h-full bg-slate-950/90 rounded-3xl border border-slate-800 overflow-hidden shadow-2xl">
       {/* Chat Header */}
-      <div className="px-4 py-3 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center">
+      <div className="px-5 py-3.5 bg-slate-900/90 border-b border-slate-800 flex items-center justify-between backdrop-blur-md">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 flex items-center justify-center shadow-inner">
             <MessageSquare className="w-4 h-4" />
           </div>
           <div>
             <div className="text-xs font-bold text-white flex items-center gap-2">
-              <span>Chat with {otherPartyName}</span>
-              <span className="text-[10px] font-normal text-slate-400">
-                ({isPoster ? 'Assigned Worker' : 'Job Poster'})
+              <span>Direct Chat with {otherPartyName}</span>
+              <span className="text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 px-2 py-0.2 rounded-md border border-emerald-500/20">
+                {isPoster ? 'Worker' : 'Poster'}
               </span>
             </div>
-            <div className="text-[10px] text-slate-400 flex items-center gap-1.5">
+            <div className="text-[10px] text-slate-400 flex items-center gap-1.5 mt-0.5">
               <span
-                className={`w-1.5 h-1.5 rounded-full ${
+                className={`w-2 h-2 rounded-full ${
                   connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
                 }`}
               />
-              <span>{connected ? 'Live Realtime' : 'Reconnecting...'}</span>
+              <span>{connected ? 'Socket.IO Encrypted Realtime' : 'Connecting...'}</span>
             </div>
           </div>
         </div>
 
         <button
-          onClick={fetchMessages}
+          onClick={() => {
+            sound.playTap();
+            fetchMessages();
+          }}
           disabled={loading}
-          className="p-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+          className="p-2 rounded-xl bg-slate-800/80 hover:bg-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
           title="Refresh Messages"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
@@ -202,25 +213,25 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
       </div>
 
       {/* Messages List View */}
-      <div className="flex-1 p-4 overflow-y-auto space-y-3 min-h-[220px] max-h-[340px]">
+      <div className="flex-1 p-5 overflow-y-auto space-y-3.5 min-h-[240px] max-h-[420px]">
         {loading && messages.length === 0 ? (
-          <div className="h-full py-12 flex flex-col items-center justify-center gap-2 text-slate-500">
-            <RefreshCw className="w-5 h-5 text-emerald-400 animate-spin" />
-            <span className="text-xs">Loading conversation history...</span>
+          <div className="h-full py-16 flex flex-col items-center justify-center gap-2 text-slate-500">
+            <RefreshCw className="w-6 h-6 text-emerald-400 animate-spin" />
+            <span className="text-xs font-medium">Connecting to secure room...</span>
           </div>
         ) : error && messages.length === 0 ? (
-          <div className="h-full py-8 flex flex-col items-center justify-center gap-2 text-center text-rose-400 px-4">
-            <AlertCircle className="w-6 h-6 shrink-0" />
-            <span className="text-xs font-medium">{error}</span>
+          <div className="h-full py-10 flex flex-col items-center justify-center gap-2 text-center text-rose-400 px-4">
+            <AlertCircle className="w-7 h-7 shrink-0" />
+            <span className="text-xs font-semibold">{error}</span>
           </div>
         ) : messages.length === 0 ? (
-          <div className="h-full py-10 flex flex-col items-center justify-center text-center px-4 space-y-2">
-            <div className="w-10 h-10 rounded-full bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
-              <Sparkles className="w-5 h-5 text-emerald-400" />
+          <div className="h-full py-12 flex flex-col items-center justify-center text-center px-4 space-y-2.5">
+            <div className="w-12 h-12 rounded-2xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400">
+              <Sparkles className="w-6 h-6 text-emerald-400" />
             </div>
-            <p className="text-xs font-semibold text-slate-200">No messages yet</p>
-            <p className="text-[11px] text-slate-400 max-w-[260px] leading-relaxed">
-              Coordinate details, timing, or ask questions directly with {otherPartyName}.
+            <p className="text-sm font-bold text-white">Direct Channel Open</p>
+            <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+              Coordinate arrival, confirm tools, or send instructions directly to {otherPartyName}.
             </p>
           </div>
         ) : (
@@ -229,35 +240,35 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             return (
               <div
                 key={msg.id}
-                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'} animate-in fade-in duration-100`}
               >
                 <div className="flex items-end gap-2 max-w-[85%]">
                   {!isMe && (
-                    <div className="w-6 h-6 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-700 text-slate-950 font-bold flex items-center justify-center text-[10px] shrink-0">
+                    <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-700 text-slate-950 font-black flex items-center justify-center text-[10px] shrink-0 shadow-md">
                       {msg.sender.name ? msg.sender.name.charAt(0).toUpperCase() : '?'}
                     </div>
                   )}
 
                   <div
-                    className={`rounded-2xl px-3.5 py-2 text-xs leading-relaxed ${
+                    className={`rounded-3xl px-4 py-2.5 text-xs leading-relaxed shadow-lg ${
                       isMe
-                        ? 'bg-gradient-to-br from-emerald-500 to-teal-600 text-slate-950 font-medium rounded-br-xs shadow-md'
+                        ? 'bg-gradient-to-br from-emerald-400 to-teal-500 text-slate-950 font-semibold rounded-br-xs'
                         : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-bl-xs'
                     }`}
                   >
                     {!isMe && (
-                      <div className="text-[10px] font-bold text-emerald-400 mb-0.5">
+                      <div className="text-[10px] font-black text-emerald-400 mb-0.5">
                         {msg.sender.name}
                       </div>
                     )}
                     <p className="whitespace-pre-wrap break-words">{msg.body}</p>
                     <div
                       className={`text-[9px] mt-1 flex items-center justify-end gap-1 ${
-                        isMe ? 'text-emerald-950/70' : 'text-slate-500'
+                        isMe ? 'text-emerald-950/80 font-bold' : 'text-slate-500'
                       }`}
                     >
                       <span>{formatMessageTime(msg.created_at)}</span>
-                      {isMe && <CheckCheck className="w-3 h-3 text-emerald-900" />}
+                      {isMe && <CheckCheck className="w-3.5 h-3.5 text-emerald-950" />}
                     </div>
                   </div>
                 </div>
@@ -268,13 +279,20 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Inline Error Toast */}
-      {error && messages.length > 0 && (
-        <div className="px-3 py-1.5 bg-rose-500/10 border-t border-rose-500/20 text-rose-400 text-[11px] flex items-center gap-1.5">
-          <AlertCircle className="w-3.5 h-3.5 shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {/* Quick Suggestion Chips */}
+      <div className="px-4 py-2 bg-slate-900/60 border-t border-slate-800/80 flex items-center gap-2 overflow-x-auto scrollbar-none">
+        <span className="text-[10px] font-bold text-slate-500 shrink-0">Quick Reply:</span>
+        {quickReplies.map((qr, idx) => (
+          <button
+            key={idx}
+            type="button"
+            onClick={() => handleSendMessage(undefined, qr)}
+            className="px-2.5 py-1 rounded-xl bg-slate-950 hover:bg-slate-800 border border-slate-800 text-[11px] text-slate-300 hover:text-white transition whitespace-nowrap cursor-pointer"
+          >
+            {qr}
+          </button>
+        ))}
+      </div>
 
       {/* Message Input Form */}
       <form
@@ -289,12 +307,12 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           placeholder={`Message ${otherPartyName}...`}
           maxLength={2000}
           disabled={sending}
-          className="flex-1 bg-slate-950/80 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500/60 focus:ring-1 focus:ring-emerald-500/30 transition disabled:opacity-50"
+          className="flex-1 bg-slate-950 border border-slate-800 rounded-2xl px-4 py-2.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500/30 transition disabled:opacity-50"
         />
         <button
           type="submit"
           disabled={!inputBody.trim() || sending}
-          className="px-3.5 py-2.5 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-500 text-slate-950 font-bold text-xs flex items-center gap-1.5 hover:from-emerald-300 hover:to-teal-400 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md shrink-0"
+          className="px-4 py-2.5 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs flex items-center gap-1.5 transition cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed shadow-md shrink-0"
         >
           {sending ? (
             <RefreshCw className="w-4 h-4 animate-spin" />

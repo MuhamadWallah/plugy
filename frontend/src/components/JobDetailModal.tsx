@@ -5,17 +5,18 @@ import {
   DollarSign, 
   Clock, 
   Star, 
-  CheckCircle2, 
   Sparkles,
   RefreshCw,
   MessageSquare,
   FileText,
-  UserCheck
+  UserCheck,
+  Check
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { ChatPanel } from './ChatPanel';
 import { RatingPrompt } from './RatingPrompt';
+import { sound } from '../utils/sound';
 
 export interface JobRating {
   id: string;
@@ -146,14 +147,12 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
     };
   }, [socket, jobId]);
 
-  // Only participants (poster or worker) can access chat once the job is accepted
   const isPoster = !!user && !!job && user.id === job.poster_id;
   const isWorker = !!user && !!job && job.worker_id !== null && user.id === job.worker_id;
   const isParticipant = isPoster || isWorker;
   const isAccepted = !!job && job.status !== 'open';
   const showChat = isAccepted && isParticipant;
 
-  // Rating state helpers
   const myRating = job?.ratings?.find((r) => r.rater_id === user?.id);
   const otherPartyRating = job?.ratings?.find((r) => r.rater_id !== user?.id);
   const isCompleted = job?.status === 'completed';
@@ -162,6 +161,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
 
   const handleRatingSuccess = (rating: { score: number; comment: string | null }) => {
     if (!job || !user) return;
+    sound.playSuccess();
     const newRatingItem: JobRating = {
       id: 'local-' + Date.now(),
       rater_id: user.id,
@@ -185,67 +185,57 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
     });
   };
 
-  const getStatusBadge = (status: string) => {
+  const steps = [
+    { key: 'open', label: '1. Posted' },
+    { key: 'accepted', label: '2. Accepted' },
+    { key: 'in_progress', label: '3. In Progress' },
+    { key: 'completed', label: '4. Completed' },
+  ];
+
+  const getStepIndex = (status: string) => {
     switch (status) {
-      case 'open':
-        return { label: 'Open', color: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' };
-      case 'accepted':
-        return { label: 'Accepted', color: 'bg-sky-500/10 text-sky-400 border-sky-500/20' };
-      case 'in_progress':
-        return { label: 'In Progress', color: 'bg-amber-500/10 text-amber-400 border-amber-500/20' };
-      case 'completed':
-        return { label: 'Completed', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
-      case 'cancelled':
-        return { label: 'Cancelled', color: 'bg-rose-500/10 text-rose-400 border-rose-500/20' };
-      default:
-        return { label: status, color: 'bg-slate-800 text-slate-300 border-slate-700' };
+      case 'open': return 0;
+      case 'accepted': return 1;
+      case 'in_progress': return 2;
+      case 'completed': return 3;
+      default: return 0;
     }
   };
 
+  const currentStepIdx = job ? getStepIndex(job.status) : 0;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-slate-950/85 backdrop-blur-md animate-in fade-in duration-150">
       <div 
         className={`bg-slate-900 border border-slate-800 rounded-3xl w-full shadow-2xl relative overflow-hidden flex flex-col max-h-[92vh] ${
-          showChat ? 'max-w-4xl' : 'max-w-lg'
+          showChat ? 'max-w-6xl' : 'max-w-3xl'
         }`}
       >
-        {/* Modal Top Bar */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/60 backdrop-blur-md z-10">
+        {/* Top Header */}
+        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between shrink-0 bg-slate-900/90 backdrop-blur-md z-10">
           <div className="flex items-center gap-3">
-            <span className="font-extrabold text-white text-base tracking-tight flex items-center gap-2">
+            <span className="font-black text-white text-base tracking-tight flex items-center gap-2">
               <Sparkles className="w-4 h-4 text-emerald-400" />
-              Plugy Job Overview
+              Plugy Job Workspace
             </span>
-
-            {job && (
-              <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold uppercase tracking-wider border ${getStatusBadge(job.status).color}`}>
-                <CheckCircle2 className="w-3 h-3" />
-                {getStatusBadge(job.status).label}
-              </span>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Mobile Tab Toggle for Jobs with Chat */}
             {showChat && (
               <div className="flex md:hidden bg-slate-950 p-1 rounded-xl border border-slate-800 mr-2">
                 <button
                   onClick={() => setMobileTab('details')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
-                    mobileTab === 'details'
-                      ? 'bg-slate-800 text-white'
-                      : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition ${
+                    mobileTab === 'details' ? 'bg-slate-800 text-white' : 'text-slate-400'
                   }`}
                 >
                   <FileText className="w-3.5 h-3.5" />
-                  <span>Details</span>
+                  <span>Specs</span>
                 </button>
                 <button
                   onClick={() => setMobileTab('chat')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition ${
-                    mobileTab === 'chat'
-                      ? 'bg-emerald-500 text-slate-950 font-bold'
-                      : 'text-slate-400 hover:text-slate-200'
+                  className={`px-3 py-1 rounded-lg text-xs font-bold flex items-center gap-1.5 transition ${
+                    mobileTab === 'chat' ? 'bg-emerald-500 text-slate-950' : 'text-slate-400'
                   }`}
                 >
                   <MessageSquare className="w-3.5 h-3.5" />
@@ -255,35 +245,67 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
             )}
 
             <button
-              onClick={onClose}
-              className="p-2 rounded-xl bg-slate-950/80 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
-              title="Close Modal"
+              onClick={() => {
+                sound.playTap();
+                onClose();
+              }}
+              className="p-2 rounded-xl bg-slate-950 border border-slate-800 text-slate-400 hover:text-white transition cursor-pointer"
+              title="Close"
             >
               <X className="w-4 h-4" />
             </button>
           </div>
         </div>
 
-        {/* Modal Body Container */}
+        {/* Interactive Lifecycle Stepper (Horizontal) */}
+        {job && job.status !== 'cancelled' && (
+          <div className="px-6 py-3 bg-slate-950/70 border-b border-slate-800/80 hidden sm:flex items-center justify-between gap-3">
+            {steps.map((st, idx) => {
+              const isPast = idx < currentStepIdx;
+              const isCurrent = idx === currentStepIdx;
+              return (
+                <div key={st.key} className="flex items-center gap-2 flex-1">
+                  <div className={`w-7 h-7 rounded-xl flex items-center justify-center text-xs font-black transition-all ${
+                    isPast
+                      ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                      : isCurrent
+                      ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/40 ring-2 ring-emerald-500/20'
+                      : 'bg-slate-900 border border-slate-800 text-slate-500'
+                  }`}>
+                    {isPast ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : idx + 1}
+                  </div>
+                  <span className={`text-xs font-bold ${isCurrent ? 'text-white' : isPast ? 'text-emerald-400' : 'text-slate-500'}`}>
+                    {st.label}
+                  </span>
+                  {idx < steps.length - 1 && (
+                    <div className={`h-0.5 flex-1 rounded-full ${isPast ? 'bg-emerald-500' : 'bg-slate-800'}`} />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Modal Body */}
         <div className="p-6 overflow-y-auto flex-1">
           {loading ? (
-            <div className="py-16 flex flex-col items-center justify-center gap-3">
+            <div className="py-20 flex flex-col items-center justify-center gap-3">
               <RefreshCw className="w-8 h-8 text-emerald-400 animate-spin" />
-              <span className="text-xs text-slate-400">Loading job details from server...</span>
+              <span className="text-xs text-slate-400">Loading full contract specs...</span>
             </div>
           ) : error || !job ? (
-            <div className="py-10 text-center space-y-3">
+            <div className="py-12 text-center space-y-3">
               <div className="text-rose-400 text-sm font-semibold">{error || 'Job not found'}</div>
               <button
                 onClick={onClose}
-                className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold"
+                className="px-4 py-2 rounded-xl bg-slate-800 text-white text-xs font-semibold cursor-pointer"
               >
                 Close
               </button>
             </div>
           ) : (
-            <div className={showChat ? 'grid grid-cols-1 md:grid-cols-12 gap-6' : 'space-y-6'}>
-              {/* LEFT COLUMN: Job Details & Ratings */}
+            <div className={showChat ? 'grid grid-cols-1 md:grid-cols-12 gap-6' : 'space-y-6 max-w-2xl mx-auto'}>
+              {/* LEFT COLUMN: Details & Ratings */}
               <div 
                 className={`${
                   showChat 
@@ -291,7 +313,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                     : 'space-y-6'
                 }`}
               >
-                {/* POST-COMPLETION RATING PROMPT (If completed & not yet rated) */}
+                {/* Rating Prompt */}
                 {shouldPromptRating && (
                   <RatingPrompt
                     jobId={job.id}
@@ -303,88 +325,81 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
 
                 {/* Category & Title */}
                 <div>
-                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
+                  <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 mb-2">
                     <Sparkles className="w-3.5 h-3.5" />
                     {job.category_name}
                   </span>
-                  <h2 className="text-xl sm:text-2xl font-black text-white tracking-tight leading-snug">
+                  <h2 className="text-2xl font-black text-white tracking-tight">
                     {job.title}
                   </h2>
                 </div>
 
-                {/* Poster & Worker Cards */}
-                <div className="space-y-2.5">
-                  {/* Poster Card */}
+                {/* Counterparty Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Poster */}
                   <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-bold flex items-center justify-center text-xs shadow-md">
+                      <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black flex items-center justify-center text-xs shadow-md">
                         {job.poster.name.charAt(0).toUpperCase()}
                       </div>
                       <div>
-                        <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
                           <span>{job.poster.name}</span>
-                          {isPoster && (
-                            <span className="text-[10px] font-bold text-emerald-400 bg-emerald-500/10 px-1.5 py-0.2 rounded border border-emerald-500/20">
-                              You
-                            </span>
-                          )}
+                          {isPoster && <span className="text-[10px] text-emerald-400 font-bold">(You)</span>}
                         </div>
                         <div className="text-[10px] text-slate-400 flex items-center gap-1">
                           <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                           <span className="font-bold text-slate-200">{Number(job.poster.rating_avg).toFixed(1)}</span>
-                          <span>({job.poster.rating_count} reviews)</span>
+                          <span>({job.poster.rating_count})</span>
                         </div>
                       </div>
                     </div>
-                    <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-slate-400 font-semibold">
-                      Poster
-                    </span>
+                    <span className="text-[10px] uppercase font-bold text-slate-400">Poster</span>
                   </div>
 
-                  {/* Worker Card (if accepted) */}
-                  {job.worker && (
+                  {/* Worker */}
+                  {job.worker ? (
                     <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 text-slate-950 font-bold flex items-center justify-center text-xs shadow-md">
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 text-slate-950 font-black flex items-center justify-center text-xs shadow-md">
                           {job.worker.name.charAt(0).toUpperCase()}
                         </div>
                         <div>
-                          <div className="text-xs font-semibold text-white flex items-center gap-1.5">
+                          <div className="text-xs font-bold text-white flex items-center gap-1.5">
                             <span>{job.worker.name}</span>
-                            {isWorker && (
-                              <span className="text-[10px] font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.2 rounded border border-sky-500/20">
-                                You
-                              </span>
-                            )}
+                            {isWorker && <span className="text-[10px] text-sky-400 font-bold">(You)</span>}
                           </div>
                           <div className="text-[10px] text-slate-400 flex items-center gap-1">
                             <Star className="w-3 h-3 text-amber-400 fill-amber-400" />
                             <span className="font-bold text-slate-200">{Number(job.worker.rating_avg).toFixed(1)}</span>
-                            <span>({job.worker.rating_count} reviews)</span>
+                            <span>({job.worker.rating_count})</span>
                           </div>
                         </div>
                       </div>
-                      <span className="text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-slate-900 border border-slate-800 text-sky-400 font-semibold flex items-center gap-1">
+                      <span className="text-[10px] uppercase font-bold text-sky-400 flex items-center gap-1">
                         <UserCheck className="w-3 h-3" />
                         Worker
                       </span>
                     </div>
+                  ) : (
+                    <div className="p-3.5 rounded-2xl bg-slate-950/40 border border-dashed border-slate-800 flex items-center justify-center text-xs text-amber-400 font-semibold italic">
+                      Waiting for a worker to accept
+                    </div>
                   )}
                 </div>
 
-                {/* Submitted Ratings & Reviews Display (When completed) */}
+                {/* Rating & Feedback Box */}
                 {isCompleted && (myRating || otherPartyRating) && (
-                  <div className="space-y-2.5 p-4 rounded-2xl bg-slate-950/70 border border-slate-800">
-                    <h4 className="text-xs font-bold text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                  <div className="space-y-2.5 p-4 rounded-2xl bg-slate-950/80 border border-slate-800">
+                    <h4 className="text-xs font-black text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
                       <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
-                      Completion Ratings & Feedback
+                      Submitted Feedback
                     </h4>
 
-                    {/* My Rating */}
                     {myRating && (
-                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-emerald-400">Your Rating for {otherPartyName}:</span>
+                          <span className="font-bold text-emerald-400">Your Rating for {otherPartyName}:</span>
                           <div className="flex items-center gap-0.5 text-amber-400">
                             {[1, 2, 3, 4, 5].map((s) => (
                               <Star
@@ -392,7 +407,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                                 className={`w-3 h-3 ${s <= myRating.score ? 'fill-amber-400' : 'text-slate-700'}`}
                               />
                             ))}
-                            <span className="text-[11px] font-bold text-white ml-1">{myRating.score}.0</span>
+                            <span className="text-xs font-black text-white ml-1">{myRating.score}.0</span>
                           </div>
                         </div>
                         {myRating.comment && (
@@ -401,11 +416,10 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                       </div>
                     )}
 
-                    {/* Other Party's Rating */}
                     {otherPartyRating && (
-                      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 space-y-1">
+                      <div className="p-3 rounded-xl bg-slate-900 border border-slate-800 space-y-1">
                         <div className="flex items-center justify-between text-xs">
-                          <span className="font-semibold text-sky-400">{otherPartyName}&apos;s Review for You:</span>
+                          <span className="font-bold text-sky-400">{otherPartyName}&apos;s Feedback:</span>
                           <div className="flex items-center gap-0.5 text-amber-400">
                             {[1, 2, 3, 4, 5].map((s) => (
                               <Star
@@ -413,7 +427,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                                 className={`w-3 h-3 ${s <= otherPartyRating.score ? 'fill-amber-400' : 'text-slate-700'}`}
                               />
                             ))}
-                            <span className="text-[11px] font-bold text-white ml-1">{otherPartyRating.score}.0</span>
+                            <span className="text-xs font-black text-white ml-1">{otherPartyRating.score}.0</span>
                           </div>
                         </div>
                         {otherPartyRating.comment && (
@@ -425,34 +439,34 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                 )}
 
                 {/* Description */}
-                <div className="space-y-1.5">
-                  <h4 className="text-xs font-bold text-slate-400 uppercase tracking-wider">Job Description</h4>
-                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed bg-slate-950/50 p-4 rounded-2xl border border-slate-800/80 whitespace-pre-wrap">
-                    {job.description || 'No additional description provided.'}
+                <div>
+                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5">Task Description</h4>
+                  <p className="text-xs sm:text-sm text-slate-300 leading-relaxed bg-slate-950/60 p-4 rounded-2xl border border-slate-800 whitespace-pre-wrap">
+                    {job.description || 'No additional details provided.'}
                   </p>
                 </div>
 
-                {/* Meta Info (Budget, Location) */}
+                {/* Location & Budget Box */}
                 <div className="grid grid-cols-2 gap-3 text-xs">
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
-                      <DollarSign className="w-4 h-4" />
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center shrink-0">
+                      <DollarSign className="w-5 h-5" />
                     </div>
                     <div>
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Budget</span>
-                      <span className="font-bold text-white text-xs sm:text-sm">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">Compensation</span>
+                      <span className="font-black text-white text-sm">
                         {job.budget !== null ? `$${Number(job.budget).toFixed(2)}` : 'Negotiable'}
                       </span>
                     </div>
                   </div>
 
-                  <div className="p-3 rounded-xl bg-slate-950/60 border border-slate-800 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-lg bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
-                      <MapPin className="w-4 h-4" />
+                  <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-sky-500/10 text-sky-400 flex items-center justify-center shrink-0">
+                      <MapPin className="w-5 h-5" />
                     </div>
                     <div className="truncate">
-                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block">Location</span>
-                      <span className="font-medium text-slate-200 truncate block text-xs">
+                      <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">Location</span>
+                      <span className="font-semibold text-slate-200 truncate block text-xs">
                         {job.location_text}
                       </span>
                     </div>
@@ -463,16 +477,16 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose }
                 <div className="flex items-center justify-between text-[11px] text-slate-500 pt-2 border-t border-slate-800">
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3.5 h-3.5" />
-                    <span>Posted {new Date(job.created_at).toLocaleString()}</span>
+                    <span>Published {new Date(job.created_at).toLocaleString()}</span>
                   </div>
-                  <span className="font-mono text-[10px]">ID: {job.id.slice(0, 8)}</span>
+                  <span className="font-mono text-[10px]">UUID: {job.id.slice(0, 8)}</span>
                 </div>
               </div>
 
-              {/* RIGHT COLUMN: Interactive Chat Panel */}
+              {/* RIGHT COLUMN: Chat Panel */}
               {showChat && (
                 <div 
-                  className={`md:col-span-6 flex flex-col h-[480px] md:h-full ${
+                  className={`md:col-span-6 flex flex-col h-[520px] md:h-full ${
                     mobileTab === 'chat' ? 'block' : 'hidden md:flex'
                   }`}
                 >

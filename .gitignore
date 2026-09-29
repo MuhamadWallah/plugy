@@ -8,6 +8,8 @@ dist/
 build/
 out/
 *.tsbuildinfo
+vite.config.js
+vite.config.d.ts
 
 # Environment files and credentials (NEVER COMMIT)
 .env
