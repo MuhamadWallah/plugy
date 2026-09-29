@@ -36,6 +36,7 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-plugy_dev_secret_key_change_in_production_min_32_chars}
       CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5174}
+      CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${BACKEND_PORT:-5001}:5000"
     volumes:
