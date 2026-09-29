@@ -81,11 +81,11 @@ export class OtpService {
   }> {
     const phone = this.normalizePhone(rawPhone);
 
-    // Find the latest active unexpired verification record
+    // Find the latest unexpired verification record for this phone number
     const result = await query(
-      `SELECT id, code_hash, expires_at, attempts
+      `SELECT id, code_hash, expires_at, attempts, verified
        FROM phone_verifications
-       WHERE phone = $1 AND verified = FALSE AND expires_at > NOW()
+       WHERE phone = $1 AND expires_at > NOW()
        ORDER BY created_at DESC
        LIMIT 1`,
       [phone]
@@ -112,11 +112,13 @@ export class OtpService {
     const isMatch = await bcrypt.compare(code.trim(), verification.code_hash);
 
     if (!isMatch) {
-      // Increment attempt counter
-      await query(
-        `UPDATE phone_verifications SET attempts = attempts + 1 WHERE id = $1`,
-        [verification.id]
-      );
+      // Increment attempt counter if not verified yet
+      if (!verification.verified) {
+        await query(
+          `UPDATE phone_verifications SET attempts = attempts + 1 WHERE id = $1`,
+          [verification.id]
+        );
+      }
       return {
         valid: false,
         error: 'Invalid verification code. Please check and try again.',
@@ -124,10 +126,12 @@ export class OtpService {
     }
 
     // Mark as verified
-    await query(
-      `UPDATE phone_verifications SET verified = TRUE WHERE id = $1`,
-      [verification.id]
-    );
+    if (!verification.verified) {
+      await query(
+        `UPDATE phone_verifications SET verified = TRUE WHERE id = $1`,
+        [verification.id]
+      );
+    }
 
     return { valid: true };
   }

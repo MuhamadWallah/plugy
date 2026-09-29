@@ -169,6 +169,11 @@ export const register = async (req: Request, res: Response) => {
 
     const user = insertResult.rows[0] as User;
 
+    // Clean up consumed phone verification records
+    if (trimmedPhone) {
+      await query('DELETE FROM phone_verifications WHERE phone = $1', [trimmedPhone]);
+    }
+
     // Create session token and set httpOnly cookie
     const token = signToken({ userId: user.id, email: user.email });
     res.cookie(COOKIE_NAME, token, getCookieOptions());

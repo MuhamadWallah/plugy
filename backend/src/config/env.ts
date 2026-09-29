@@ -4,7 +4,7 @@ dotenv.config();
 
 const NODE_ENV = (process.env.NODE_ENV || 'development') as 'development' | 'production' | 'test';
 const isProduction = NODE_ENV === 'production';
-const isTest = NODE_ENV === 'test';
+const isTest = NODE_ENV === 'test' || process.env.VITEST === 'true';
 
 // Validate JWT Secret
 const DEFAULT_DEV_JWT_SECRET = 'plugy_dev_secret_key_change_in_production_min_32_chars';

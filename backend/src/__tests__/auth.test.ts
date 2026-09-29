@@ -292,5 +292,40 @@ describe('Authentication API & Protected Routes', () => {
       expect(dupOtpRes.body).toHaveProperty('error');
       expect(dupOtpRes.body.error).toMatch(/already registered/i);
     });
+
+    it('completes registration when phone is first verified via verify-otp then submitted to register', async () => {
+      const twoStepPhone = `+1555${Math.floor(100000 + Math.random() * 900000)}`;
+
+      // 1. Request OTP
+      const otpRes = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: twoStepPhone })
+        .expect(200);
+
+      const code = otpRes.body.devOtp;
+
+      // 2. Pre-verify OTP (step 1 in UI)
+      const verifyRes = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({ phone: twoStepPhone, otp: code })
+        .expect(200);
+
+      expect(verifyRes.body).toHaveProperty('verified', true);
+
+      // 3. Complete registration (step 2 in UI)
+      const regRes = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Two Step Verified User',
+          email: `twostep_${Date.now()}@plugy.dev`,
+          password: 'Password123!',
+          phone: twoStepPhone,
+          otp: code,
+        })
+        .expect(201);
+
+      expect(regRes.body).toHaveProperty('user');
+      expect(regRes.body.user).toHaveProperty('phone_verified', true);
+    });
   });
 });
