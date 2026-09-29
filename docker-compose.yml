@@ -1,0 +1,75 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: plugy_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-plugy}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-plugy_secret}
+      POSTGRES_DB: ${POSTGRES_DB:-plugy}
+    ports:
+      - "${POSTGRES_PORT:-5434}:5432"
+    volumes:
+      - plugy_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-plugy} -d ${POSTGRES_DB:-plugy}"]
+      interval: 3s
+      timeout: 5s
+      retries: 5
+    networks:
+      - plugy_network
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: plugy_backend
+    restart: unless-stopped
+    environment:
+      PORT: 5000
+      DATABASE_URL: postgres://${POSTGRES_USER:-plugy}:${POSTGRES_PASSWORD:-plugy_secret}@postgres:5432/${POSTGRES_DB:-plugy}
+      PGHOST: postgres
+      PGPORT: 5432
+      PGUSER: ${POSTGRES_USER:-plugy}
+      PGPASSWORD: ${POSTGRES_PASSWORD:-plugy_secret}
+      PGDATABASE: ${POSTGRES_DB:-plugy}
+      NODE_ENV: ${NODE_ENV:-development}
+      JWT_SECRET: ${JWT_SECRET:-plugy_dev_secret_key_change_in_production_min_32_chars}
+      CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5174}
+    ports:
+      - "${BACKEND_PORT:-5001}:5000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - plugy_network
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: plugy_frontend
+    restart: unless-stopped
+    environment:
+      VITE_BACKEND_URL: http://backend:5000
+    ports:
+      - "${FRONTEND_PORT:-5174}:5173"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - backend
+    networks:
+      - plugy_network
+
+volumes:
+  plugy_pgdata:
+    name: plugy_pgdata
+
+networks:
+  plugy_network:
+    name: plugy_network
+    driver: bridge
