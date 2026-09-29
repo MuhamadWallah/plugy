@@ -182,4 +182,115 @@ describe('Authentication API & Protected Routes', () => {
       expect(clearedCookie).toMatch(/Max-Age=0/);
     });
   });
+
+  describe('5. Phone Number OTP Verification & Registration', () => {
+    const otpTestPhone = `+1555${Math.floor(100000 + Math.random() * 900000)}`;
+    let generatedOtp: string;
+
+    it('sends 6-digit one-time password to a valid phone number', async () => {
+      const response = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: otpTestPhone })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('message');
+      expect(response.body).toHaveProperty('devOtp');
+      expect(response.body.devOtp).toMatch(/^[0-9]{6}$/);
+      generatedOtp = response.body.devOtp;
+    });
+
+    it('rejects sending OTP to invalid phone number format with 400 Bad Request', async () => {
+      const response = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: '123' })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error', 'Validation failed');
+    });
+
+    it('enforces 60-second cooldown on repeated OTP dispatch with 429 Too Many Requests', async () => {
+      const response = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: otpTestPhone })
+        .expect(429);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toMatch(/wait 60 seconds/i);
+    });
+
+    it('rejects verify-otp with incorrect 6-digit code with 400 Bad Request', async () => {
+      const response = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({
+          phone: otpTestPhone,
+          otp: '000000',
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toMatch(/invalid verification code/i);
+    });
+
+    it('rejects registration with invalid OTP code with 400 Bad Request', async () => {
+      const response = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'OTP Test User',
+          email: `otptest_${Date.now()}@plugy.dev`,
+          password: 'Password123!',
+          phone: otpTestPhone,
+          otp: '999999',
+        })
+        .expect(400);
+
+      expect(response.body).toHaveProperty('error');
+      expect(response.body.error).toMatch(/invalid.*code/i);
+    });
+
+    it('successfully verifies phone OTP with correct code', async () => {
+      const response = await request(app)
+        .post('/api/auth/verify-otp')
+        .send({
+          phone: otpTestPhone,
+          otp: generatedOtp,
+        })
+        .expect(200);
+
+      expect(response.body).toHaveProperty('verified', true);
+    });
+
+    it('completes registration with verified phone number and marks phone_verified = true', async () => {
+      const newPhone = `+1555${Math.floor(100000 + Math.random() * 900000)}`;
+      // Send OTP to new phone
+      const otpRes = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: newPhone })
+        .expect(200);
+
+      const code = otpRes.body.devOtp;
+
+      const regRes = await request(app)
+        .post('/api/auth/register')
+        .send({
+          name: 'Verified Courier',
+          email: `verified_${Date.now()}@plugy.dev`,
+          password: 'Password123!',
+          phone: newPhone,
+          otp: code,
+        })
+        .expect(201);
+
+      expect(regRes.body).toHaveProperty('user');
+      expect(regRes.body.user).toHaveProperty('phone_verified', true);
+
+      // Subsequent attempt to send OTP for this verified phone returns 409 Conflict
+      const dupOtpRes = await request(app)
+        .post('/api/auth/send-otp')
+        .send({ phone: newPhone })
+        .expect(409);
+
+      expect(dupOtpRes.body).toHaveProperty('error');
+      expect(dupOtpRes.body.error).toMatch(/already registered/i);
+    });
+  });
 });

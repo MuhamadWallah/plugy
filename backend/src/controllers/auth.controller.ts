@@ -1,10 +1,98 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import { query } from '../config/db.js';
-import { registerSchema, loginSchema } from '../validators/auth.validator.js';
+import { registerSchema, loginSchema, sendOtpSchema, verifyOtpSchema } from '../validators/auth.validator.js';
 import { COOKIE_NAME, getCookieOptions, signToken } from '../config/jwt.js';
 import { User, UserWithPassword } from '../types/auth.types.js';
+import { otpService } from '../services/otp.service.js';
+import { env } from '../config/env.js';
 
+/**
+ * POST /api/auth/send-otp
+ * Dispatches a 6-digit one-time password to the specified phone number
+ */
+export const sendOtp = async (req: Request, res: Response) => {
+  try {
+    const parseResult = sendOtpSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const { phone } = parseResult.data;
+    const normalizedPhone = otpService.normalizePhone(phone);
+
+    // Check for existing user with this verified phone number
+    const existing = await query(
+      'SELECT id FROM users WHERE phone = $1 AND phone_verified = TRUE',
+      [normalizedPhone]
+    );
+
+    if (existing.rows.length > 0) {
+      return res.status(409).json({
+        error: 'An account with this phone number is already registered',
+      });
+    }
+
+    const result = await otpService.sendOtp(normalizedPhone);
+
+    if (!result.success) {
+      return res.status(429).json({
+        error: result.error,
+        retryAfterSeconds: result.retryAfterSeconds,
+      });
+    }
+
+    return res.status(200).json({
+      message: result.message,
+      phone: result.phone,
+      devOtp: result.devOtp,
+    });
+  } catch (error) {
+    console.error('Send OTP error:', error);
+    return res.status(500).json({ error: 'Failed to send one-time password' });
+  }
+};
+
+/**
+ * POST /api/auth/verify-otp
+ * Verifies a 6-digit one-time password for a phone number
+ */
+export const verifyOtpHandler = async (req: Request, res: Response) => {
+  try {
+    const parseResult = verifyOtpSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        error: 'Validation failed',
+        details: parseResult.error.flatten().fieldErrors,
+      });
+    }
+
+    const { phone, otp } = parseResult.data;
+    const result = await otpService.verifyOtp(phone, otp);
+
+    if (!result.valid) {
+      return res.status(400).json({
+        error: result.error || 'Invalid verification code',
+      });
+    }
+
+    return res.status(200).json({
+      verified: true,
+      message: 'Phone number verified successfully',
+    });
+  } catch (error) {
+    console.error('Verify OTP error:', error);
+    return res.status(500).json({ error: 'Failed to verify code' });
+  }
+};
+
+/**
+ * POST /api/auth/register
+ * Registers a new account, enforcing phone number verification via OTP
+ */
 export const register = async (req: Request, res: Response) => {
   try {
     const parseResult = registerSchema.safeParse(req.body);
@@ -15,18 +103,56 @@ export const register = async (req: Request, res: Response) => {
       });
     }
 
-    const { name, email, password, phone } = parseResult.data;
+    const { name, email, password, phone, otp } = parseResult.data;
+    const trimmedPhone = phone && phone.trim() !== '' ? phone.trim() : null;
 
     // Check for existing user with case-insensitive email match
-    const existing = await query(
+    const existingEmail = await query(
       'SELECT id FROM users WHERE LOWER(email) = LOWER($1)',
       [email]
     );
 
-    if (existing.rows.length > 0) {
+    if (existingEmail.rows.length > 0) {
       return res.status(409).json({
         error: 'An account with this email already exists',
       });
+    }
+
+    // Check for existing user with this phone number (if phone provided)
+    if (trimmedPhone) {
+      const existingPhone = await query(
+        'SELECT id FROM users WHERE phone = $1',
+        [trimmedPhone]
+      );
+
+      if (existingPhone.rows.length > 0) {
+        return res.status(409).json({
+          error: 'An account with this phone number already exists',
+        });
+      }
+    }
+
+    // Verify phone OTP
+    let phoneVerified = false;
+
+    if (trimmedPhone) {
+      if (otp) {
+        const verifyResult = await otpService.verifyOtp(trimmedPhone, otp);
+        if (!verifyResult.valid) {
+          return res.status(400).json({
+            error: verifyResult.error || 'Invalid or expired phone verification code',
+          });
+        }
+        phoneVerified = true;
+      } else {
+        // In production, OTP is mandatory if phone is provided
+        if (env.NODE_ENV === 'production') {
+          return res.status(400).json({
+            error: 'Phone verification code (OTP) is required to complete registration',
+          });
+        }
+        phoneVerified = true;
+      }
     }
 
     // Hash the password securely
@@ -35,10 +161,10 @@ export const register = async (req: Request, res: Response) => {
 
     // Insert user into database
     const insertResult = await query(
-      `INSERT INTO users (name, email, password_hash, phone)
-       VALUES ($1, $2, $3, $4)
-       RETURNING id, name, email, phone, avatar_url, rating_avg, rating_count, created_at, updated_at`,
-      [name, email, password_hash, phone || null]
+      `INSERT INTO users (name, email, password_hash, phone, phone_verified)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING id, name, email, phone, phone_verified, avatar_url, rating_avg, rating_count, created_at, updated_at`,
+      [name, email, password_hash, trimmedPhone, phoneVerified]
     );
 
     const user = insertResult.rows[0] as User;
@@ -57,6 +183,9 @@ export const register = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * POST /api/auth/login
+ */
 export const login = async (req: Request, res: Response) => {
   try {
     const parseResult = loginSchema.safeParse(req.body);
@@ -71,7 +200,7 @@ export const login = async (req: Request, res: Response) => {
 
     // Look up user by email
     const result = await query(
-      `SELECT id, name, email, password_hash, phone, avatar_url, rating_avg, rating_count, created_at, updated_at
+      `SELECT id, name, email, password_hash, phone, phone_verified, avatar_url, rating_avg, rating_count, created_at, updated_at
        FROM users
        WHERE LOWER(email) = LOWER($1)`,
       [email]
@@ -106,6 +235,9 @@ export const login = async (req: Request, res: Response) => {
   }
 };
 
+/**
+ * POST /api/auth/logout
+ */
 export const logout = (_req: Request, res: Response) => {
   res.clearCookie(COOKIE_NAME, {
     ...getCookieOptions(),
@@ -117,6 +249,9 @@ export const logout = (_req: Request, res: Response) => {
   });
 };
 
+/**
+ * GET /api/auth/me
+ */
 export const getMe = (req: Request, res: Response) => {
   if (!req.user) {
     return res.status(401).json({ error: 'Not authenticated' });

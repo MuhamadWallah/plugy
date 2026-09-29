@@ -3,6 +3,7 @@ export interface User {
   name: string;
   email: string;
   phone: string | null;
+  phone_verified?: boolean;
   avatar_url: string | null;
   rating_avg: string | number;
   rating_count: number;
@@ -15,6 +16,7 @@ export interface RegisterData {
   email: string;
   password: string;
   phone?: string;
+  otp?: string;
 }
 
 export interface LoginData {

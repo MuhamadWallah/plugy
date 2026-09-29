@@ -5,6 +5,7 @@ export interface User {
   name: string;
   email: string;
   phone: string | null;
+  phone_verified?: boolean;
   avatar_url: string | null;
   rating_avg: string | number;
   rating_count: number;
