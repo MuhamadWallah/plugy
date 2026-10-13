@@ -1,3 +1,4 @@
+# Local development stack (hot reload). For production use docker-compose.prod.yml — see DEPLOYMENT.md.
 services:
   postgres:
     image: postgres:16-alpine
@@ -23,6 +24,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile
+      target: development
     container_name: plugy_backend
     restart: unless-stopped
     environment:
@@ -36,6 +38,8 @@ services:
       NODE_ENV: ${NODE_ENV:-development}
       JWT_SECRET: ${JWT_SECRET:-plugy_dev_secret_key_change_in_production_min_32_chars}
       CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5174}
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      EMERGENCY_NUMBER: ${EMERGENCY_NUMBER:-112}
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${BACKEND_PORT:-5001}:5000"
@@ -52,6 +56,7 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      target: development
     container_name: plugy_frontend
     restart: unless-stopped
     environment:

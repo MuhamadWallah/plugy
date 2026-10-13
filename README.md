@@ -1,12 +1,20 @@
 # Plugy ⚡
 
-**Plugy** is a small-jobs marketplace web application (inspired by InDrive's courier on-demand model, but tailored for local service requests and direct worker acceptance).
+**Plugy** is a local small-jobs marketplace that works like InDrive's "you set the price" model, applied to home services:
+
+1. A customer posts a job with a location (GPS, address search or map pin) and the price they want to pay, or asks workers to propose one.
+2. Nearby workers see it live with its distance, then **accept the price or counter-offer** with their own price, arrival time and note.
+3. The customer compares offers (price, rating, reviews, jobs done), can **raise the price**, and **hires** the worker they choose.
+4. The worker navigates there, taps **On my way** (the customer follows them live on the map), **Arrived**, **Start** and **Done**. The two can call and chat once matched.
+5. Both rate each other. Cancellations and back-outs carry a reason, a back-out reopens the job, and anyone can report a user.
+
+It also covers what a real service needs: requested time and payment method, automatic expiry of unanswered requests, an installable app with push notifications, a safety screen (emergency call, share job details), password reset by SMS, and an admin queue for reports and suspensions.
 
 ---
 
 ## Architecture Overview
 
-* **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons
+* **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, Lucide Icons, Leaflet + OpenStreetMap
 * **Backend**: Node.js, TypeScript, Express, Socket.IO, `pg` (node-postgres connection pool)
 * **Database**: PostgreSQL 16 with custom schema migrations (`node-pg-migrate`)
 * **Containerization**: Docker Compose
@@ -80,6 +88,8 @@ Plugy/
    docker compose down
    ```
 
+> **After changing dependencies** (`package.json`), rebuild with `docker compose up -d --build -V`. The `-V` flag recreates the containers' `node_modules` volumes, which would otherwise keep the old packages.
+
 ---
 
 ## Database Migrations
@@ -109,7 +119,7 @@ The database comes pre-seeded with 6 core categories:
 
 ## Automated Test Suite
 
-Run the full end-to-end integration and unit test suite across all 8 steps:
+Run the full integration test suite:
 
 ```bash
 docker compose exec backend npm test
@@ -117,7 +127,9 @@ docker compose exec backend npm test
 
 Test suites cover:
 - Authentication & Sessions (`auth.test.ts`)
-- Concurrency & Race-Condition Safe Job Acceptance (`jobs.test.ts`)
+- Feed, Nearby Search, Offers/Counter-Offers & Race-Condition Safe Hiring (`jobs.test.ts`)
+- Arrival Flow, Contact & Location Privacy, Back-Outs, Profiles & Reports (`marketplace.test.ts`)
+- Scheduling, Expiry, Web Push, Password Reset & Moderation (`operations.test.ts`)
 - Lifecycle Status Transitions & Personal List (`transitions.test.ts`)
 - Direct Scoped Chat & Realtime WebSocket Delivery (`messages.test.ts`)
 - Post-Completion Ratings & Averages (`ratings.test.ts`)
@@ -127,6 +139,13 @@ Test suites cover:
 
 ## Production Deployment & User Checklist
 
-- **Production Deployment Guide**: see [DEPLOYMENT.md](file:///m:/PROJECTS/Plugy/DEPLOYMENT.md) for managed Postgres, HTTPS reverse proxy, WebSocket proxying, and horizontal scaling.
-- **User Readiness & Verification Checklist**: see [CHECKLIST.md](file:///m:/PROJECTS/Plugy/CHECKLIST.md) for feature inventory, MVP stubs, and end-to-end manual testing instructions.
+`docker-compose.yml` is for local development only. For production, use the compiled, nginx-fronted stack:
+
+```bash
+cp .env.production.example .env.production   # set PUBLIC_URL, JWT_SECRET, POSTGRES_PASSWORD, TWILIO_*
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+- **Production Deployment Guide**: see [DEPLOYMENT.md](DEPLOYMENT.md) for HTTPS, required SMS setup, environment variables, managed Postgres, backups, and scaling.
+- **User Readiness & Verification Checklist**: see [CHECKLIST.md](CHECKLIST.md) for feature inventory, MVP stubs, and end-to-end manual testing instructions.
 

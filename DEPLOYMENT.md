@@ -1,181 +1,243 @@
 # Plugy — Production Deployment Guide
 
-This guide details the exact steps and architecture required to transition Plugy from local `docker-compose` to a hardened, scalable production host.
+Plugy ships with a production Docker setup that has been verified end to end (fresh database migration, REST API, WebSocket chat through the proxy, rate limiting, graceful restarts). This guide covers deploying it.
 
 ---
 
-## 1. Architecture Topology
+## 1. Architecture
 
 ```
-[Browser / Mobile Client]
-          │
-          │ HTTPS (443) / WSS (WebSockets)
-          ▼
-[Reverse Proxy / CDN / Load Balancer] (Cloudflare / Nginx / Caddy / AWS ALB)
-    ├── Static Assets (SPA) ──► CDN / Object Storage (Cloudflare Pages / S3 / Vercel)
-    │
-    └── API & WebSockets (/api/*, /socket.io/*)
-          │
-          ▼
-   [Node.js Backend] (Express + Socket.IO Server instances)
-          │
-          │ Managed Connection Pool (PgBouncer) / SSL (TLSv1.3)
-          ▼
-   [Managed PostgreSQL] (AWS RDS / Neon / Supabase / DigitalOcean Managed DB)
+[Browser]
+    │  HTTPS / WSS
+    ▼
+[TLS proxy]  Caddy, Cloudflare, a cloud load balancer, or host nginx + certbot
+    │  HTTP
+    ▼
+[web]  nginx (frontend image, production target)
+    ├── /            → built React SPA (static files)
+    ├── /api/*       → backend:5000
+    └── /socket.io/* → backend:5000 (WebSocket upgrade)
+                │
+                ▼
+         [backend]  Node.js: compiled Express + Socket.IO (backend image, production target)
+                │  migrations run automatically on start
+                ▼
+         [postgres]  bundled PostgreSQL 16 container, or a managed database
 ```
 
----
+The SPA must be served from the **same origin** as the API: it calls relative `/api` URLs, and the session cookie is `SameSite=Strict`. The `web` container takes care of this.
 
-## 2. Managed PostgreSQL Setup
+| File | Purpose |
+| :--- | :--- |
+| `docker-compose.prod.yml` | Production stack: `postgres`, `backend`, `web` |
+| `.env.production.example` | Template for production settings and secrets |
+| `backend/Dockerfile` (target `production`) | Compiled TypeScript, runtime deps only, non-root, healthcheck, runs migrations then `node dist/index.js` |
+| `frontend/Dockerfile` (target `production`) | Vite build served by nginx with API/WebSocket proxying, asset caching, gzip and security headers |
+| `frontend/nginx/default.conf.template` | nginx config (the backend address comes from `BACKEND_UPSTREAM`) |
 
-In development, Postgres runs in a local container on port `5434`. In production, use a managed database instance:
-
-1. **Provision Managed Database**:
-   - Recommended providers: AWS RDS Aurora PostgreSQL 16, Supabase, Neon, or DigitalOcean Managed PostgreSQL.
-2. **Enable Connection Pooling**:
-   - Highly recommended to use **PgBouncer** (often built into Supabase and Neon) to maintain hundreds of concurrent worker/poster connections without exhausting database process limits.
-3. **Enforce SSL**:
-   - Cloud providers require SSL (`sslmode=require`).
-   - Plugy's `db.ts` automatically activates SSL when `NODE_ENV=production` and connecting to non-local endpoints:
-     ```bash
-     DATABASE_URL=postgres://plugy_admin:YOUR_SECURE_PASSWORD@db.managed-host.com:5432/plugy?sslmode=require
-     ```
-4. **Run Migrations on Deploy**:
-   - Run migrations as part of your CI/CD deployment pipeline before traffic reaches new container versions:
-     ```bash
-     npm run migrate:up
-     ```
+`docker-compose.yml` is the **development** stack (hot reload, dev servers). Don't use it in production.
 
 ---
 
-## 3. HTTPS & Reverse Proxy Configuration
+## 2. Deploy on a single host (Docker Compose)
 
-Every production deployment must terminate TLS/HTTPS at the edge and forward to the internal application.
+Requirements: a Linux server with Docker Engine and the Compose plugin, a domain pointing at the server, and Twilio credentials (see §4).
 
-### Nginx Example Configuration
+```bash
+git clone <your-repo-url> plugy && cd plugy
+
+cp .env.production.example .env.production
+# Edit .env.production: set PUBLIC_URL, JWT_SECRET, POSTGRES_PASSWORD, TWILIO_*
+# Generate a JWT secret:
+node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
+
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+Check it:
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production ps    # all services "healthy"
+curl -s http://localhost/api/health                                         # {"status":"ok",...}
+docker compose -f docker-compose.prod.yml --env-file .env.production logs -f backend
+```
+
+Compose refuses to start if `PUBLIC_URL`, `JWT_SECRET` or `POSTGRES_PASSWORD` is missing, and the backend refuses to start with a weak or default `JWT_SECRET`.
+
+### Updating to a new version
+
+```bash
+git pull
+docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
+```
+
+New migrations apply automatically when the backend starts. The backend shuts down gracefully (in about 1s) on `SIGTERM`. Connected browsers reconnect their WebSocket and rejoin open chats automatically. nginx resolves the backend at request time, so recreating the backend container never requires restarting `web`.
+
+### Backups (bundled database)
+
+```bash
+docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
+  pg_dump -U plugy -d plugy --format=custom > plugy-$(date +%F).dump
+```
+
+The data lives in the Docker volume `plugy_prod_pgdata`. Schedule the dump (cron) and copy it off the host.
+
+---
+
+## 3. HTTPS
+
+The `web` container serves plain HTTP. Terminate TLS in front of it. The session cookie is `Secure`, so **login only works over HTTPS** (or on `http://localhost`).
+
+**Option A: Caddy on the same host (automatic Let's Encrypt).** In `.env.production`, set `HTTP_BIND=127.0.0.1`, `HTTP_PORT=8080` and `TRUST_PROXY=2`, then use this `/etc/caddy/Caddyfile`:
+
+```
+plugy.example.com {
+    reverse_proxy 127.0.0.1:8080
+}
+```
+
+Caddy proxies WebSockets automatically.
+
+**Option B: host nginx + certbot.** Same `.env.production` settings as Option A:
 
 ```nginx
-# /etc/nginx/sites-available/plugy.conf
-
-upstream plugy_backend {
-    server 127.0.0.1:5000;
-    keepalive 64;
-}
-
-# Redirect HTTP to HTTPS
-server {
-    listen 80;
-    server_name plugy.yourdomain.com;
-    return 301 https://$host$request_uri;
-}
-
 server {
     listen 443 ssl http2;
-    server_name plugy.yourdomain.com;
-
-    # SSL Certificates (Let's Encrypt / Certbot)
-    ssl_certificate /etc/letsencrypt/live/plugy.yourdomain.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/plugy.yourdomain.com/privkey.pem;
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_ciphers HIGH:!aNULL:!MD5;
-
-    # Frontend Static SPA Assets
-    root /var/www/plugy/frontend/dist;
-    index index.html;
+    server_name plugy.example.com;
+    ssl_certificate     /etc/letsencrypt/live/plugy.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/plugy.example.com/privkey.pem;
 
     location / {
-        try_files $uri $uri/ /index.html;
-    }
-
-    # API Proxy
-    location /api/ {
-        proxy_pass http://plugy_backend;
-        proxy_http_version 1.1;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
-    # Realtime WebSocket Proxy (Socket.IO)
-    location /socket.io/ {
-        proxy_pass http://plugy_backend;
+        proxy_pass http://127.0.0.1:8080;
         proxy_http_version 1.1;
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "upgrade";
         proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-
-        # Prevent idle WebSocket connections from timing out
-        proxy_read_timeout 86400s;
-        proxy_send_timeout 86400s;
+        proxy_read_timeout 1h;
     }
+}
+server {
+    listen 80;
+    server_name plugy.example.com;
+    return 301 https://$host$request_uri;
 }
 ```
 
+**Option C: Cloudflare or a cloud load balancer** in front of port 80. Enable WebSockets and set `TRUST_PROXY=2`.
+
+### `TRUST_PROXY`, the proxy hop count
+
+Rate limits are per client IP. `TRUST_PROXY` tells the API how many proxies sit in front of it, so it reads the real client IP from `X-Forwarded-For`:
+
+- `1`: the bundled nginx only (clients connect straight to the `web` container).
+- `2`: one more proxy in front (Caddy, host nginx, Cloudflare, a load balancer).
+
+If it's set too low, every user shares the proxy's IP and its rate-limit bucket. If it's set too high, clients can spoof their IP.
+
 ---
 
-## 4. WebSocket Support & Horizontal Scaling
+## 4. SMS for phone verification (required)
 
-1. **Proxy Headers**:
-   - Ensure the proxy forwards `Upgrade $http_upgrade` and `Connection "upgrade"`.
-2. **Timeouts**:
-   - Set proxy read/send timeouts to at least 24 hours (`86400s`) or configure regular Socket.IO ping/pong heartbeats.
-3. **Horizontal Scaling Across Multiple Backend Nodes**:
-   - If running more than 1 backend container instance, install and configure `@socket.io/redis-adapter` with a Redis/Valkey instance so events (job created, accepted, chat messages) broadcast across all nodes.
-   - Configure **sticky sessions** (IP hash or cookie-based routing) on your load balancer for the initial HTTP long-polling handshake before upgrade.
+Registration requires a verified phone number. In production the code is delivered **only** by SMS: it isn't shown on screen or written to logs. Set `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` and `TWILIO_PHONE_NUMBER`. Without them:
+
+- the backend logs a startup warning,
+- `POST /api/auth/send-otp` returns `503 Unable to send the verification SMS`,
+- **new users cannot sign up** (existing users can still log in).
 
 ---
 
-## 5. Production Environment Variables Checklist
+## 4b. Maps, location and address search
 
-Set these in your host's secure environment manager (AWS Parameter Store, Doppler, Vault, or platform environment settings). **Never commit these to git:**
+- **HTTPS is required for location.** Browsers only allow GPS access ("Use my location", live worker tracking) on HTTPS pages (or `localhost`). On plain HTTP the app falls back to address search.
+- **Map tiles** come from the OpenStreetMap tile servers and **address search** from OpenStreetMap Nominatim. Both are free but meant for light use: the app follows their rules (attribution, at most one search per second, no search-as-you-type). See the [tile](https://operations.osmfoundation.org/policies/tiles/) and [Nominatim](https://operations.osmfoundation.org/policies/nominatim/) usage policies. Once you have real traffic, switch to a commercial or self-hosted provider: change the tile URL in `frontend/src/components/MapView.tsx` and the `NOMINATIM` base URL in `frontend/src/utils/geo.ts`.
+- **Live location** is relayed from the hired worker's phone to the customer only while the worker has the job screen open (browsers can't share location from the background). Positions are never stored.
+- **Privacy:** the public feed shows only an approximate location (about 1 km). The exact pin and phone numbers are revealed only to the customer and the hired worker.
 
-| Variable | Recommended Production Value | Description |
+---
+
+## 4c. Push notifications and the installable app
+
+Plugy is an installable web app ("Add to Home Screen"). With push enabled, users get alerts for new offers, being hired, "worker on the way / arrived", completed jobs and chat messages, even when Plugy is closed.
+
+1. Generate a key pair **once** and keep it forever. Changing keys makes every device re-subscribe the next time it opens Plugy.
+   ```bash
+   docker run --rm node:22-alpine npx -y web-push generate-vapid-keys
+   ```
+2. Put them in `.env.production` as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY`, with a contact address in `VAPID_SUBJECT` (`mailto:you@yourdomain`).
+3. Users turn alerts on from **My profile → Notifications on this device** (they're also asked after posting a job or sending an offer).
+
+Notes:
+- Push requires HTTPS. **iPhone users must add Plugy to the Home Screen first** (iOS 16.4+ only delivers web push to installed apps); the profile page tells them how.
+- Without VAPID keys the backend logs a warning and push stays off; live in-app alerts still work while Plugy is open.
+- Signing out removes that device's subscription, so a shared phone doesn't keep receiving the previous user's alerts.
+
+## 4d. Operations: moderation, safety number, request expiry
+
+- **Moderation:** list admin emails in `ADMIN_EMAILS` (comma-separated). Those accounts see **Reports** in the menu, where they can dismiss reports or suspend an account. Suspending blocks sign-in, ends the person's live sessions, cancels their open jobs and withdraws their pending offers. Admins can reinstate accounts from the resolved list.
+- **Safety screen:** shows a call button for `EMERGENCY_NUMBER` (default `112`, which works from most mobile networks). Set your country's number if different.
+- **Request expiry:** open requests close automatically when nobody is hired: "as soon as possible" requests after `JOB_OPEN_HOURS` (default 72), scheduled ones two hours after their requested time. The customer is notified and can repost.
+- **Password reset** uses an SMS code to the verified phone number (Twilio, see §4) and signs out every other device.
+
+---
+
+## 5. Environment variables
+
+Set these in `.env.production` (git-ignored). Never commit real values.
+
+| Variable | Default | Description |
 | :--- | :--- | :--- |
-| `NODE_ENV` | `production` | Enables production optimisations and disables stack trace leakage |
-| `PORT` | `5000` | Internal listening port |
-| `DATABASE_URL` | `postgres://user:pass@host:5432/plugy?sslmode=require` | Managed PostgreSQL connection string |
-| `JWT_SECRET` | *(64-character random string)* | Secret for signing auth tokens (min 32 chars) |
-| `JWT_EXPIRES_IN` | `7d` | Session expiration window |
-| `CORS_ORIGIN` | `https://plugy.yourdomain.com` | Strict origin matching for cross-origin requests |
-| `COOKIE_SECURE` | `true` | Restricts session cookie to HTTPS connections |
-| `RATE_LIMIT_AUTH_MAX` | `10` | Max auth attempts per IP per 15-minute window |
-| `RATE_LIMIT_JOBS_MAX` | `20` | Max job creation requests per IP per 15-minute window |
+| `PUBLIC_URL` | *(required)* | Public origin, e.g. `https://plugy.example.com`. Allowed CORS/WebSocket origin; comma-separate several (apex + www) |
+| `JWT_SECRET` | *(required)* | Session signing secret, at least 32 chars (use 64+ random chars) |
+| `POSTGRES_PASSWORD` | *(required)* | Password for the bundled database (letters/digits, or URL-encode it) |
+| `POSTGRES_USER` / `POSTGRES_DB` | `plugy` | Bundled database user and name |
+| `DATABASE_URL` | bundled postgres | Point at a managed database instead (see §6) |
+| `JWT_EXPIRES_IN` | `7d` | Session lifetime |
+| `HTTP_BIND` / `HTTP_PORT` | `0.0.0.0` / `80` | Where the `web` container listens on the host |
+| `COOKIE_SECURE` | `true` | HTTPS-only session cookie. Set `false` only for a temporary plain-HTTP test |
+| `TRUST_PROXY` | `1` | Proxy hop count (see §3) |
+| `RATE_LIMIT_AUTH_MAX` | `15` | Auth/OTP requests per IP per 15 minutes |
+| `RATE_LIMIT_JOBS_MAX` | `30` | Job posts per IP per 15 minutes |
+| `RATE_LIMIT_OFFERS_MAX` | `60` | Offers sent per IP per 15 minutes |
+| `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` | *(empty: push off)* | Web Push keys (see §4c) |
+| `VAPID_SUBJECT` | `mailto:support@plugy.app` | Contact for push services; use your own address |
+| `ADMIN_EMAILS` | *(empty)* | Accounts that can review reports and suspend users |
+| `EMERGENCY_NUMBER` | `112` | Number on the in-app Safety screen |
+| `JOB_OPEN_HOURS` | `72` | Hours before an unanswered "as soon as possible" request expires |
+| `RUN_MIGRATIONS` | `true` | Run migrations on backend start. Set `false` if a release step runs `npm run migrate:up` |
+| `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | *(empty)* | SMS delivery (see §4) |
 
 ---
 
-## 6. Production Build & Deployment Pipeline
+## 6. Managed PostgreSQL (optional)
 
-### Backend Multi-Stage Production Dockerfile
+To use AWS RDS, Neon, Supabase, DigitalOcean, etc., set:
 
-```dockerfile
-# Multi-stage production build
-FROM node:20-alpine AS builder
-WORKDIR /app
-COPY package*.json tsconfig.json ./
-RUN npm ci
-COPY src/ ./src/
-RUN npm run build
-
-FROM node:20-alpine AS runner
-WORKDIR /app
-ENV NODE_ENV=production
-COPY package*.json ./
-RUN npm ci --only=production
-COPY --from=builder /app/dist ./dist
-COPY migrations/ ./migrations/
-USER node
-EXPOSE 5000
-CMD ["node", "dist/index.js"]
-```
-
-### Frontend Production Build
 ```bash
-cd frontend
-npm ci
-npm run build
-# Upload ./dist to Cloudflare Pages, S3+CloudFront, or Nginx root
+DATABASE_URL=postgres://user:password@db.example.com:5432/plugy?sslmode=require
 ```
+
+The backend enables TLS automatically for non-local hosts in production, and migrations run against this URL on start. The bundled `postgres` service then sits idle: remove it and the backend's `depends_on` from `docker-compose.prod.yml` if you don't want it. For many concurrent users, use the provider's connection pooler (PgBouncer).
+
+---
+
+## 7. Running on a platform instead of Compose
+
+Both images are standalone:
+
+- **Backend**: `docker build --target production ./backend`. Needs the env vars above (`CORS_ORIGIN` takes the place of `PUBLIC_URL`, plus `DATABASE_URL`). Health check: `GET /api/health` on port 5000.
+- **Web**: `docker build --target production ./frontend`. Set `BACKEND_UPSTREAM` to the backend's `host:port`. Health check: `GET /healthz` on port 80.
+
+Both must be reachable under one public origin. The web image provides that by proxying `/api` and `/socket.io`.
+
+---
+
+## 8. Scaling beyond one backend instance
+
+Socket.IO rooms live in process memory. Before running more than one backend replica:
+
+1. Add `@socket.io/redis-adapter` with Redis/Valkey so events reach clients on every node.
+2. Enable sticky sessions on the load balancer, for the long-polling handshake.
+
+Migrations are safe to run from several replicas at once (node-pg-migrate takes an advisory lock).
