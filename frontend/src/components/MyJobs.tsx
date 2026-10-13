@@ -18,46 +18,44 @@ import {
   Search,
   CheckCheck,
   TrendingUp,
-  Activity
+  Activity,
+  Car,
+  Home,
+  Hourglass,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
+import { Job, OfferStatus } from '../types/marketplace';
+import { formatEta, formatMoney, formatSchedule, paymentLabel, relativeTime } from '../utils/format';
 import { sound } from '../utils/sound';
+import { Portal } from './Portal';
 
-export interface MyJob {
-  id: string;
-  poster_id: string;
-  worker_id: string | null;
-  category_slug: string;
-  category_name: string;
-  category_icon?: string;
-  title: string;
-  description: string;
-  location_text: string;
-  budget: number | null;
-  status: 'open' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
-  created_at: string;
-  accepted_at: string | null;
-  completed_at: string | null;
-  updated_at: string;
+export interface MyJob extends Job {
   is_poster: boolean;
   is_worker: boolean;
   has_rated?: boolean;
-  poster: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-    rating_avg: string | number;
-    rating_count: number;
-  };
-  worker: {
-    id: string;
-    name: string;
-    avatar_url: string | null;
-    rating_avg: string | number;
-    rating_count: number;
-  } | null;
 }
+
+interface MyOffer {
+  id: string;
+  job_id: string;
+  price: string | number;
+  eta_minutes: number | null;
+  status: OfferStatus;
+  updated_at: string;
+  job: {
+    id: string;
+    title: string;
+    status: string;
+    budget: string | number | null;
+    location_text: string;
+    category_name: string;
+    poster: { id: string; name: string; rating_avg: string | number; rating_count: number };
+  };
+}
+
+const priceOf = (job: MyJob) => job.agreed_price ?? job.budget;
 
 interface MyJobsProps {
   onSelectJob: (jobId: string) => void;
@@ -65,7 +63,7 @@ interface MyJobsProps {
   onNavigateToFeed: () => void;
 }
 
-type RoleFilter = 'all' | 'posted' | 'accepted';
+type RoleFilter = 'all' | 'posted' | 'accepted' | 'offers';
 type StatusFilter = 'all' | 'active' | 'completed' | 'cancelled';
 
 export const MyJobs: React.FC<MyJobsProps> = ({ 
@@ -77,6 +75,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
   const { socket } = useSocket();
 
   const [jobs, setJobs] = useState<MyJob[]>([]);
+  const [offers, setOffers] = useState<MyOffer[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [filterRole, setFilterRole] = useState<RoleFilter>('all');
   const [filterStatus, setFilterStatus] = useState<StatusFilter>('all');
@@ -95,12 +94,17 @@ export const MyJobs: React.FC<MyJobsProps> = ({
     if (!user) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/jobs/mine', {
-        credentials: 'include',
-      });
-      if (res.ok) {
-        const data = await res.json();
+      const [jobsRes, offersRes] = await Promise.all([
+        fetch('/api/jobs/mine', { credentials: 'include' }),
+        fetch('/api/offers/mine', { credentials: 'include' }),
+      ]);
+      if (jobsRes.ok) {
+        const data = await jobsRes.json();
         setJobs(data.jobs || []);
+      }
+      if (offersRes.ok) {
+        const data = await offersRes.json();
+        setOffers(data.offers || []);
       }
     } catch (err) {
       console.error('Failed to fetch personal jobs:', err);
@@ -123,8 +127,13 @@ export const MyJobs: React.FC<MyJobsProps> = ({
           if (j.id === jobId) {
             return {
               ...j,
-              ...job,
               status: status as MyJob['status'],
+              worker_id: job?.worker_id ?? j.worker_id,
+              agreed_price: job?.agreed_price ?? j.agreed_price,
+              en_route_at: job?.en_route_at ?? null,
+              arrived_at: job?.arrived_at ?? null,
+              completed_at: job?.completed_at ?? j.completed_at,
+              updated_at: job?.updated_at ?? j.updated_at,
             };
           }
           return j;
@@ -132,25 +141,44 @@ export const MyJobs: React.FC<MyJobsProps> = ({
       });
     };
 
-    const handleJobAccepted = ({ jobId, job }: { jobId: string; job: MyJob }) => {
+    // Hired from another tab/device: reload to get the worker's private details
+    const handleJobAccepted = ({ jobId }: { jobId: string }) => {
       setJobs((prev) => {
-        return prev.map((j) => {
-          if (j.id === jobId) {
-            return { ...j, ...job, status: 'accepted' };
-          }
-          return j;
-        });
+        if (prev.some((j) => j.id === jobId && j.status === 'open')) fetchMyJobs();
+        return prev;
       });
     };
 
+    // Offer activity on my jobs
+    const adjustOfferCount = (jobId: string, delta: number) =>
+      setJobs((prev) =>
+        prev.map((j) => (j.id === jobId && typeof j.offer_count === 'number' ? { ...j, offer_count: Math.max(0, j.offer_count + delta) } : j))
+      );
+    const handleOfferNew = ({ jobId, updated }: { jobId: string; updated?: boolean }) => {
+      if (!updated) adjustOfferCount(jobId, 1);
+    };
+    const handleOfferWithdrawn = ({ jobId }: { jobId: string }) => adjustOfferCount(jobId, -1);
+
     socket.on('job:status_updated', handleStatusUpdated);
     socket.on('job:accepted', handleJobAccepted);
+    socket.on('offer:new', handleOfferNew);
+    socket.on('offer:withdrawn', handleOfferWithdrawn);
+    socket.on('offer:accepted', fetchMyJobs);
+    socket.on('offer:updated', fetchMyJobs);
+    socket.on('job:released', fetchMyJobs);
+    socket.on('connect', fetchMyJobs);
 
     return () => {
       socket.off('job:status_updated', handleStatusUpdated);
       socket.off('job:accepted', handleJobAccepted);
+      socket.off('offer:new', handleOfferNew);
+      socket.off('offer:withdrawn', handleOfferWithdrawn);
+      socket.off('offer:accepted', fetchMyJobs);
+      socket.off('offer:updated', fetchMyJobs);
+      socket.off('job:released', fetchMyJobs);
+      socket.off('connect', fetchMyJobs);
     };
-  }, [socket]);
+  }, [socket, fetchMyJobs]);
 
   // Actions
   const handleStartJob = async (jobId: string) => {
@@ -216,7 +244,9 @@ export const MyJobs: React.FC<MyJobsProps> = ({
     const total = jobs.length;
     const active = jobs.filter((j) => j.status === 'accepted' || j.status === 'in_progress').length;
     const completed = jobs.filter((j) => j.status === 'completed').length;
-    const totalVolume = jobs.reduce((sum, j) => sum + (j.budget ? Number(j.budget) : 0), 0);
+    const totalVolume = jobs
+      .filter((j) => j.status !== 'cancelled')
+      .reduce((sum, j) => sum + (priceOf(j) ? Number(priceOf(j)) : 0), 0);
     return { total, active, completed, totalVolume };
   }, [jobs]);
 
@@ -249,20 +279,30 @@ export const MyJobs: React.FC<MyJobsProps> = ({
     return result;
   }, [jobs, filterRole, filterStatus, searchQuery]);
 
-  const getStatusBadge = (status: MyJob['status']) => {
+  const getStatusBadge = (job: MyJob) => {
+    const status = job.status;
+    if (status === 'accepted' && (job.arrived_at || job.en_route_at)) {
+      const arrived = !!job.arrived_at;
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-500/10 text-sky-300 border border-sky-500/30">
+          {arrived ? <Home className="w-3.5 h-3.5" /> : <Car className="w-3.5 h-3.5" />}
+          {arrived ? 'Arrived' : 'On the way'}
+        </span>
+      );
+    }
     switch (status) {
       case 'open':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
             <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse"></span>
-            Open
+            {job.is_poster ? 'Getting offers' : 'Open'}
           </span>
         );
       case 'accepted':
         return (
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider bg-sky-500/10 text-sky-400 border border-sky-500/20">
             <span className="w-1.5 h-1.5 rounded-full bg-sky-400"></span>
-            Accepted
+            Hired
           </span>
         );
       case 'in_progress':
@@ -380,7 +420,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
         <div className="p-5 rounded-3xl bg-slate-900/80 border border-slate-800 shadow-lg backdrop-blur-md flex items-center justify-between">
           <div>
             <span className="text-[10px] font-black uppercase tracking-wider text-sky-400 block mb-1">
-              Volume Budgeted
+              Total value
             </span>
             <div className="text-2xl font-black text-white">
               ${metrics.totalVolume.toFixed(2)}
@@ -446,7 +486,20 @@ export const MyJobs: React.FC<MyJobsProps> = ({
                   : 'text-slate-400 hover:text-white'
               }`}
             >
-              Accepted by Me ({jobs.filter((j) => j.is_worker).length})
+              Hired for ({jobs.filter((j) => j.is_worker).length})
+            </button>
+            <button
+              onClick={() => {
+                sound.playTap();
+                setFilterRole('offers');
+              }}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition cursor-pointer ${
+                filterRole === 'offers'
+                  ? 'bg-emerald-500 text-slate-950 shadow-md shadow-emerald-500/20'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              My offers ({offers.filter((o) => o.status === 'pending').length})
             </button>
           </div>
 
@@ -465,8 +518,53 @@ export const MyJobs: React.FC<MyJobsProps> = ({
         </div>
       </div>
 
-      {/* Jobs Multi-Column Grid */}
-      {loading ? (
+      {/* My offers (worker) */}
+      {filterRole === 'offers' ? (
+        offers.length === 0 ? (
+          <div className="p-12 text-center rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-3 max-w-lg mx-auto">
+            <Hourglass className="w-8 h-8 text-slate-500 mx-auto" />
+            <h3 className="text-base font-bold text-white">No offers yet</h3>
+            <p className="text-xs text-slate-400">Find a job nearby and accept the price or offer your own.</p>
+            <button
+              onClick={onNavigateToFeed}
+              className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-xs"
+            >
+              Browse jobs
+            </button>
+          </div>
+        ) : (
+          <ul className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {offers.map((offer) => (
+              <li key={offer.id}>
+                <button
+                  onClick={() => onSelectJob(offer.job_id)}
+                  className="w-full text-left p-5 rounded-3xl bg-slate-900/80 border border-slate-800/80 hover:border-slate-700 space-y-2"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span
+                      className={`text-[11px] font-black uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+                        offer.status === 'pending'
+                          ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
+                          : 'bg-slate-800 text-slate-400 border-slate-700'
+                      }`}
+                    >
+                      {offer.status === 'pending' ? 'Waiting for customer' : offer.status === 'declined' ? 'Declined' : 'Not selected'}
+                    </span>
+                    <span className="text-lg font-black text-white">{formatMoney(offer.price)}</span>
+                  </div>
+                  <h3 className="text-base font-black text-white">{offer.job.title}</h3>
+                  <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
+                    <span className="flex items-center gap-1"><MapPin className="w-3 h-3" />{offer.job.location_text}</span>
+                    <span>· {offer.job.poster.name}</span>
+                    {offer.eta_minutes !== null && <span>· {formatEta(offer.eta_minutes)}</span>}
+                    <span>· {relativeTime(offer.updated_at)}</span>
+                  </p>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )
+      ) : loading ? (
         <div className="py-16 text-center space-y-3">
           <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
           <p className="text-xs text-slate-400">Loading personal contracts...</p>
@@ -522,7 +620,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
                 <div className="space-y-3">
                   <div className="flex items-center justify-between gap-2 flex-wrap">
                     <div className="flex items-center gap-2">
-                      {getStatusBadge(job.status)}
+                      {getStatusBadge(job)}
 
                       <span className="text-xs font-bold text-emerald-400 capitalize flex items-center gap-1">
                         <Sparkles className="w-3 h-3" />
@@ -551,12 +649,16 @@ export const MyJobs: React.FC<MyJobsProps> = ({
 
                     <span className="flex items-center gap-1 font-bold text-white bg-slate-950 px-2.5 py-0.5 rounded-lg border border-slate-800">
                       <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
-                      {job.budget !== null ? `$${Number(job.budget).toFixed(2)}` : 'Negotiable'}
+                      {formatMoney(priceOf(job)) ?? 'Open to offers'}
+                    </span>
+
+                    <span className="flex items-center gap-1 text-sky-300 text-[11px] font-semibold">
+                      {formatSchedule(job.scheduled_for)} · {paymentLabel(job.payment_method)}
                     </span>
 
                     <span className="flex items-center gap-1 text-slate-500 text-[11px]">
                       <Clock className="w-3 h-3" />
-                      Updated {new Date(job.updated_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      Updated {relativeTime(job.updated_at ?? job.created_at)}
                     </span>
                   </div>
 
@@ -574,7 +676,22 @@ export const MyJobs: React.FC<MyJobsProps> = ({
                             </div>
                           </div>
                         ) : (
-                          <span className="text-amber-400 font-semibold italic">Waiting for a worker to claim...</span>
+                          job.status === 'open' ? (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onSelectJob(job.id);
+                              }}
+                              className={`flex items-center gap-1.5 font-bold ${job.offer_count ? 'text-emerald-300' : 'text-amber-400 italic'}`}
+                            >
+                              <Users className="w-3.5 h-3.5" />
+                              {job.offer_count
+                                ? `${job.offer_count} offer${job.offer_count === 1 ? '' : 's'} waiting · Review`
+                                : 'Waiting for offers…'}
+                            </button>
+                          ) : (
+                            <span className="text-slate-500 italic">No worker hired</span>
+                          )
                         )
                       ) : (
                         <div className="flex items-center gap-2">
@@ -707,6 +824,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
 
       {/* Confirmation Modal for Complete or Cancel */}
       {confirmModal && (
+        <Portal>
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-in fade-in duration-100">
           <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-md w-full p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
@@ -757,6 +875,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
             </div>
           </div>
         </div>
+        </Portal>
       )}
     </div>
   );

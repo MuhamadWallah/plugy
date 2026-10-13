@@ -11,13 +11,14 @@ import {
   VolumeX, 
   Menu, 
   X,
-  Radio
+  Radio,
+  ShieldAlert,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { sound } from '../utils/sound';
 
-export type NavView = 'feed' | 'my-jobs' | 'post-job' | 'dashboard' | 'login' | 'register';
+export type NavView = 'feed' | 'my-jobs' | 'post-job' | 'dashboard' | 'admin' | 'login' | 'register';
 
 interface NavbarProps {
   currentView: NavView;
@@ -43,9 +44,9 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800/80 bg-slate-950/85 backdrop-blur-xl transition-all">
-      <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 h-16 flex items-center justify-between">
+      <div className="w-full px-3 sm:px-6 lg:px-8 xl:px-10 h-16 flex items-center justify-between gap-2">
         {/* Left Section: Brand & Live Market Indicator */}
-        <div className="flex items-center gap-6 lg:gap-8">
+        <div className="flex items-center gap-6 lg:gap-8 min-w-0">
           <button
             onClick={() => handleNavigate('feed')}
             className="flex items-center gap-3 text-left group cursor-pointer focus:outline-none"
@@ -56,7 +57,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             <div>
               <span className="text-xl font-black tracking-tight text-white flex items-center gap-2">
                 Plugy
-                <span className="text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
+                <span className="hidden sm:inline text-[10px] font-bold tracking-wider uppercase px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shadow-sm">
                   Marketplace
                 </span>
               </span>
@@ -64,7 +65,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
           </button>
 
           {/* Desktop Navigation Links */}
-          <nav className="hidden md:flex items-center gap-1.5">
+          <nav className="hidden md:flex items-center gap-1.5 whitespace-nowrap">
             <button
               onClick={() => handleNavigate('feed')}
               className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
@@ -102,29 +103,44 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                   <UserIcon className="w-3.5 h-3.5" />
                   My Account
                 </button>
+
+                {user.is_admin && (
+                  <button
+                    onClick={() => handleNavigate('admin')}
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold transition cursor-pointer ${
+                      currentView === 'admin'
+                        ? 'bg-slate-900 text-rose-300 border border-slate-800 shadow-inner'
+                        : 'text-rose-300/80 hover:text-rose-200 hover:bg-slate-900/50'
+                    }`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    Reports
+                  </button>
+                )}
               </>
             )}
           </nav>
         </div>
 
         {/* Center / Pulse Ticker (Desktop only) */}
-        <div className="hidden xl:flex items-center gap-3 px-3 py-1 rounded-full bg-slate-900/70 border border-slate-800/80 text-[11px] text-slate-400">
+        <div className="hidden 2xl:flex items-center gap-3 px-3 py-1 rounded-full bg-slate-900/70 border border-slate-800/80 text-[11px] text-slate-400">
           <div className="flex items-center gap-1.5">
             <Radio className={`w-3 h-3 ${socketConnected ? 'text-emerald-400 animate-pulse' : 'text-amber-400'}`} />
             <span className="font-semibold text-slate-300">
-              {socketConnected ? 'Live Network Connected' : 'Reconnecting...'}
+              {socketConnected ? 'Live' : 'Reconnecting...'}
             </span>
           </div>
           <span>&bull;</span>
-          <span className="text-slate-400">Real-time InDrive Courier Dispatch</span>
+          <span className="text-slate-400">You set the price. Workers make offers. You choose.</span>
         </div>
 
         {/* Right Section: Sound toggle, Post a Job, Profile / Auth Actions */}
-        <div className="flex items-center gap-2.5 sm:gap-3">
+        <div className="flex items-center gap-2 sm:gap-3 shrink-0">
           {/* Sound FX Toggle Button */}
           <button
             onClick={handleToggleSound}
-            className={`p-2 rounded-xl border text-xs transition cursor-pointer ${
+            aria-label={soundActive ? 'Mute sounds' : 'Enable sounds'}
+            className={`hidden sm:inline-flex p-2 rounded-xl border text-xs transition cursor-pointer ${
               soundActive
                 ? 'bg-slate-900/80 border-slate-800 text-emerald-400 hover:text-emerald-300'
                 : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-400'
@@ -137,14 +153,15 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
           {/* Post a Job button */}
           <button
             onClick={() => handleNavigate('post-job')}
-            className={`inline-flex items-center gap-1.5 px-3.5 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-md cursor-pointer ${
+            aria-label="Post a Job"
+            className={`inline-flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-xl text-xs font-extrabold transition shadow-md cursor-pointer ${
               currentView === 'post-job'
                 ? 'bg-emerald-400 text-slate-950 shadow-emerald-500/30'
                 : 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/20'
             }`}
           >
             <PlusCircle className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span className="hidden xs:inline">Post a Job</span>
+            <span className="hidden sm:inline">Post a Job</span>
           </button>
 
           {loading ? (
@@ -153,7 +170,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             <div className="flex items-center gap-2">
               <button
                 onClick={() => handleNavigate('dashboard')}
-                className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer text-left"
+                aria-label="Your profile"
+                className="flex items-center gap-2.5 px-1.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer text-left"
               >
                 <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black">
                   {user.name.charAt(0).toUpperCase()}
@@ -173,7 +191,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                   sound.playTap();
                   logout();
                 }}
-                className="p-2 rounded-xl text-slate-400 hover:text-rose-400 bg-slate-900/80 border border-slate-800 hover:border-rose-900/50 transition cursor-pointer"
+                className="hidden sm:inline-flex p-2 rounded-xl text-slate-400 hover:text-rose-400 bg-slate-900/80 border border-slate-800 hover:border-rose-900/50 transition cursor-pointer"
                 title="Sign Out"
               >
                 <LogOut className="w-4 h-4" />
@@ -204,6 +222,8 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
           {/* Mobile Menu Hamburger */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+            aria-expanded={mobileMenuOpen}
             className="md:hidden p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-white"
           >
             {mobileMenuOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
@@ -221,7 +241,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
             }`}
           >
             <LayoutList className="w-4 h-4" />
-            Browse Jobs Live Board
+            Find jobs
           </button>
 
           {user && (
@@ -233,7 +253,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                 }`}
               >
                 <Briefcase className="w-4 h-4" />
-                My Jobs & Contracts
+                My jobs & offers
               </button>
 
               <button
@@ -243,9 +263,42 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                 }`}
               >
                 <UserIcon className="w-4 h-4" />
-                Account & Security Settings
+                My profile
               </button>
+
+              {user.is_admin && (
+                <button
+                  onClick={() => handleNavigate('admin')}
+                  className={`w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 ${
+                    currentView === 'admin' ? 'bg-slate-900 text-rose-300' : 'text-rose-300/80 hover:bg-slate-900/50'
+                  }`}
+                >
+                  <ShieldAlert className="w-4 h-4" />
+                  Safety reports
+                </button>
+              )}
             </>
+          )}
+
+          <button
+            onClick={handleToggleSound}
+            className="sm:hidden w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 text-slate-300 hover:bg-slate-900/50"
+          >
+            {soundActive ? <Volume2 className="w-4 h-4" /> : <VolumeX className="w-4 h-4" />}
+            {soundActive ? 'Sounds on' : 'Sounds off'}
+          </button>
+
+          {user && (
+            <button
+              onClick={() => {
+                setMobileMenuOpen(false);
+                logout();
+              }}
+              className="sm:hidden w-full text-left px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 text-rose-300 hover:bg-slate-900/50"
+            >
+              <LogOut className="w-4 h-4" />
+              Sign out
+            </button>
           )}
 
           {!user && (

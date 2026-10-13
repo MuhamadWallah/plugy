@@ -93,3 +93,108 @@ body {
   transform: translateY(-3px);
   box-shadow: 0 16px 32px -8px rgba(16, 185, 129, 0.12), 0 0 0 1px rgba(16, 185, 129, 0.35);
 }
+
+/* ------------------------------------------------------------------
+   OpenStreetMap (Leaflet) styling
+   ------------------------------------------------------------------ */
+.plugy-map {
+  background: #0b1220;
+  z-index: 0;
+}
+
+/* Dark-mode tiles: invert the standard OSM style to match the app */
+.plugy-map .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.85) contrast(0.9) saturate(0.6);
+}
+
+.plugy-map .leaflet-control-attribution {
+  background: rgba(2, 6, 23, 0.75);
+  color: #94a3b8;
+  font-size: 10px;
+}
+
+.plugy-map .leaflet-control-attribution a {
+  color: #6ee7b7;
+}
+
+.plugy-map .leaflet-bar a {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-bottom-color: #1e293b;
+}
+
+.plugy-map .leaflet-bar a:hover {
+  background: #1e293b;
+}
+
+.plugy-marker-wrapper {
+  background: transparent;
+  border: none;
+}
+
+.plugy-marker {
+  position: relative;
+  width: max-content;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+.plugy-marker__dot {
+  display: block;
+  width: 16px;
+  height: 16px;
+  border-radius: 9999px;
+  border: 3px solid #020617;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.85), 0 4px 10px rgba(0, 0, 0, 0.5);
+}
+
+.plugy-marker__label {
+  position: absolute;
+  bottom: 18px;
+  white-space: nowrap;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1;
+  padding: 4px 6px;
+  border-radius: 8px;
+  background: #020617;
+  color: #f8fafc;
+  border: 1px solid #334155;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.45);
+}
+
+.plugy-marker--job .plugy-marker__dot { background: #10b981; }
+.plugy-marker--job-active .plugy-marker__dot { background: #fbbf24; width: 20px; height: 20px; }
+.plugy-marker--job-active .plugy-marker__label { background: #fbbf24; color: #020617; border-color: #fbbf24; }
+.plugy-marker--pin .plugy-marker__dot { background: #f43f5e; width: 20px; height: 20px; }
+.plugy-marker--me .plugy-marker__dot { background: #38bdf8; }
+.plugy-marker--me .plugy-marker__dot::after,
+.plugy-marker--worker .plugy-marker__dot::after {
+  content: '';
+  position: absolute;
+  inset: -10px;
+  border-radius: 9999px;
+  border: 2px solid currentColor;
+  animation: beaconPing 2.5s cubic-bezier(0, 0, 0.2, 1) infinite;
+}
+.plugy-marker--me { color: #38bdf8; }
+.plugy-marker--worker { color: #a78bfa; }
+.plugy-marker--worker .plugy-marker__dot { background: #a78bfa; width: 20px; height: 20px; }
+
+.plugy-circle--radius {
+  stroke: #10b981;
+  stroke-width: 1.5;
+  stroke-dasharray: 6 6;
+  fill: #10b981;
+  fill-opacity: 0.06;
+}
+
+.plugy-circle--approx {
+  stroke: #fbbf24;
+  stroke-width: 1.5;
+  fill: #fbbf24;
+  fill-opacity: 0.12;
+}

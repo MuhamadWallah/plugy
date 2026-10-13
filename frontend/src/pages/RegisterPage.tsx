@@ -498,15 +498,17 @@ export const RegisterPage: React.FC<RegisterPageProps> = ({ onSwitchToLogin, onS
             )}
           </button>
 
-          {/* Fill Sample Details */}
-          <button
-            type="button"
-            onClick={handleSampleFill}
-            className="w-full py-2 px-3 rounded-2xl bg-slate-950 border border-dashed border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
-          >
-            <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
-            Fill Sample Details
-          </button>
+          {/* Fill Sample Details (development builds only) */}
+          {import.meta.env.DEV && (
+            <button
+              type="button"
+              onClick={handleSampleFill}
+              className="w-full py-2 px-3 rounded-2xl bg-slate-950 border border-dashed border-slate-800 hover:border-slate-700 text-slate-400 hover:text-slate-300 text-xs font-semibold flex items-center justify-center gap-1.5 transition cursor-pointer"
+            >
+              <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+              Fill Sample Details (dev)
+            </button>
+          )}
         </form>
 
         {/* Switch to Login */}

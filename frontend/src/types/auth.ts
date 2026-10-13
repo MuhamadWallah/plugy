@@ -9,6 +9,8 @@ export interface User {
   rating_count: number;
   created_at: string;
   updated_at?: string;
+  /** Can review reports and suspend accounts */
+  is_admin?: boolean;
 }
 
 export interface RegisterData {

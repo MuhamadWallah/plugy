@@ -8,3 +8,10 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <App />
   </React.StrictMode>,
 );
+
+// Service worker for push notifications (and "Add to Home Screen" installs)
+if ('serviceWorker' in navigator && window.isSecureContext) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => console.warn('Service worker registration failed:', err));
+  });
+}

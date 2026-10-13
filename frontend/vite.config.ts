@@ -8,6 +8,18 @@ export default defineConfig(({ mode }) => {
 
   return {
     plugins: [react()],
+    build: {
+      rollupOptions: {
+        output: {
+          // Long-lived vendor chunks so app updates don't invalidate cached libraries
+          manualChunks: {
+            react: ['react', 'react-dom'],
+            map: ['leaflet'],
+            realtime: ['socket.io-client'],
+          },
+        },
+      },
+    },
     server: {
       host: '0.0.0.0',
       port: 5173,

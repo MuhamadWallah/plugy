@@ -47,8 +47,8 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   const otherPartyName = isPoster ? (workerName || 'Worker') : posterName;
 
   const quickReplies = isPoster
-    ? ['What is your ETA?', 'Cleaning supplies are in the hall closet.', 'Looks fantastic, thank you!']
-    : ['I am on my way now!', 'Arrived at the location.', 'Finished the job, please review!'];
+    ? ['What time will you arrive?', "I'm home and ready.", 'Thank you, great job!']
+    : ["I'm on my way now.", "I've arrived.", 'All done. Please check the work.'];
 
   const scrollToBottom = useCallback((smooth = true) => {
     if (messagesEndRef.current) {
@@ -93,9 +93,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   useEffect(() => {
     if (!socket) return;
 
-    // Join the job's dedicated communication room
-    socket.emit('join:job', jobId);
-
+    // Room membership is handled by the job workspace (useJobRoom); this only listens
     const handleNewMessage = (newMessage: ChatMessage) => {
       if (newMessage.job_id === jobId) {
         sound.playMessagePop();
@@ -112,7 +110,6 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
     socket.on('message:new', handleNewMessage);
 
     return () => {
-      socket.emit('leave:job', jobId);
       socket.off('message:new', handleNewMessage);
     };
   }, [socket, jobId, scrollToBottom]);
@@ -194,7 +191,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
                   connected ? 'bg-emerald-400 animate-pulse' : 'bg-slate-500'
                 }`}
               />
-              <span>{connected ? 'Socket.IO Encrypted Realtime' : 'Connecting...'}</span>
+              <span>{connected ? 'Live chat' : 'Connecting...'}</span>
             </div>
           </div>
         </div>

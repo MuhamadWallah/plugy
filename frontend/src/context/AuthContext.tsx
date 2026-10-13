@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { User, LoginData, RegisterData, AuthContextType } from '../types/auth';
+import { ensurePushSubscription, unregisterPushForThisDevice } from '../utils/push';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -33,6 +34,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     refreshUser();
   }, [refreshUser]);
+
+  // Re-register this device for push alerts for whoever is signed in (no prompt; only if already allowed)
+  const userId = user?.id;
+  useEffect(() => {
+    if (userId) ensurePushSubscription().catch(() => {});
+  }, [userId]);
 
   const login = async (data: LoginData) => {
     setError(null);
@@ -88,6 +95,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   };
 
   const logout = async () => {
+    // Stop this device receiving the signed-out user's alerts (needs the session, so do it first)
+    await unregisterPushForThisDevice();
     try {
       await fetch('/api/auth/logout', {
         method: 'POST',
