@@ -38,6 +38,7 @@ import { PlaceResult, haversineKm, searchPlaces } from '../utils/geo';
 import { requestNotificationPermission } from '../utils/notify';
 import { MapView, MapMarker } from './MapView';
 import { OfferModal } from './OfferModal';
+import { WorkModeCard } from './WorkModeCard';
 import { sound } from '../utils/sound';
 
 export type FeedJob = Job;
@@ -341,6 +342,8 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
           </button>
         </div>
       )}
+
+      {user && <WorkModeCard location={location} onLocate={locate} locating={locating} />}
 
       {/* Location bar */}
       <div className="p-4 rounded-3xl bg-slate-900/80 border border-slate-800/80 shadow-xl space-y-3">

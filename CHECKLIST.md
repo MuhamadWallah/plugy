@@ -98,6 +98,7 @@ This checklist documents everything that has been built, what is intentionally s
 - [x] **Installable app + push notifications:** manifest, icons, service worker; Web Push (VAPID) for new offers, hired, on the way, arrived, completed, back-outs, cancellations, expiry and chat messages. Suppressed while Plugy is on screen; one subscription per device; removed on sign-out; dead endpoints pruned.
 - [x] **Safety screen:** emergency call button (`EMERGENCY_NUMBER`), share job details (who, where, when, status) with someone you trust, report.
 - [x] **Forgot password by SMS code** (no account enumeration); resetting signs out every other session.
+- [x] **Worker online mode:** workers pick the work they do, how far they travel and for how long (auto-off), then go online. New matching jobs within their distance are pushed to them (closest 50 per job), also when a job reopens; their location refreshes from GPS while Plugy is open and is never exposed. Their kinds of work show on their public profile.
 - [x] **Moderation:** admins (`ADMIN_EMAILS`) review reports, dismiss or suspend. Suspension blocks sign-in and live connections and takes the user's open jobs and offers off the market; reinstatement supported.
 
 ---
@@ -112,7 +113,7 @@ Before scaling to public commercial users, the following items are simplified or
 | **Background location** | Live tracking only while the worker keeps the job screen open | Native app or installable PWA with background location |
 | **Payments & Escrow** | In-app budget agreement with direct cash/offline settlement | Integrate Stripe Connect or Escrow.com (hold payment upon job acceptance, release on completion) |
 | **Image & Avatar Uploads** | Dynamic user initials with gradient avatar cards | AWS S3, Cloudflare R2, or Uploadthing with image compression & CDN URLs |
-| **Notifications** | Live in-app alerts + Web Push to installed/opted-in devices | SMS fallback for critical events; notify nearby workers of new jobs (needs stored worker availability/location) |
+| **Notifications** | Live in-app alerts + Web Push to installed/opted-in devices, including new-job alerts for online workers | SMS fallback for critical events |
 | **Moderation** | Admin report queue with dismiss/suspend | Audit log, appeals, ID verification for workers |
 | **Password Reset** | SMS code to the verified phone | Add email-based reset for users without a phone |
 | **Horizontal WebSocket Scaling** | Single-node in-memory Socket.IO rooms | Add `@socket.io/redis-adapter` with Redis/Valkey for multi-node Kubernetes/container scaling |
@@ -121,7 +122,7 @@ Before scaling to public commercial users, the following items are simplified or
 
 ## 3. Manual Testing Checklist (Before Showing to Real Users)
 
-The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow and 18/18 for scheduling, safety, password reset, moderation and push against the dev stack; the hiring flow and push subscription also pass against the production stack.
+The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow, 18/18 for scheduling, safety, password reset, moderation and push, and 8/8 for worker online mode against the dev stack; the hiring flow and push subscription also pass against the production stack.
 
 Open two browser windows (Window 1: normal, Window 2: incognito). Location features need `http://localhost` or HTTPS; allow location access when asked.
 
@@ -159,7 +160,12 @@ Open two browser windows (Window 1: normal, Window 2: incognito). Location featu
 4. Sign out, use **Forgot password?** with your phone number, set a new password: you're signed in and other devices are signed out.
 5. As an admin (`ADMIN_EMAILS`), open **Reports**, dismiss one report and suspend a test account; the suspended account can no longer sign in and its open jobs disappear.
 
-### Test 7: Things going wrong
+### Test 7: Worker online mode
+1. As a worker, on **Find jobs** tap **Go online**, choose your kinds of work, a distance and how long, and allow notifications.
+2. Switch to another page (or close Plugy). Have a customer post a matching job nearby: a **New job near you** alert arrives with the price, distance and a link to make an offer.
+3. A job in a kind of work you didn't choose, or outside your distance, sends no alert. **Go offline** stops all alerts.
+
+### Test 8: Things going wrong
 1. Hire Worker B on a new job, then in Worker B's window choose **I can't do this job** with a reason. Customer A is told why, the job is open again, and earlier offers are restored.
 2. Cancel a job from the customer side with a reason; workers who made offers are notified.
 3. Use **Report** on the other party and pick a reason; a second report within 24 hours is refused.

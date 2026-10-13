@@ -19,7 +19,8 @@ export const getUserProfile = async (req: Request, res: Response) => {
       `SELECT u.id, u.name, u.avatar_url, u.rating_avg, u.rating_count, u.phone_verified,
          u.created_at AS member_since,
          (SELECT COUNT(*)::int FROM jobs WHERE worker_id = u.id AND status = 'completed') AS jobs_completed,
-         (SELECT COUNT(*)::int FROM jobs WHERE poster_id = u.id) AS jobs_posted
+         (SELECT COUNT(*)::int FROM jobs WHERE poster_id = u.id) AS jobs_posted,
+         COALESCE((SELECT wa.categories FROM worker_availability wa WHERE wa.user_id = u.id), '{}') AS work_categories
        FROM users u
        WHERE u.id = $1`,
       [id]

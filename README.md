@@ -8,7 +8,7 @@
 4. The worker navigates there, taps **On my way** (the customer follows them live on the map), **Arrived**, **Start** and **Done**. The two can call and chat once matched.
 5. Both rate each other. Cancellations and back-outs carry a reason, a back-out reopens the job, and anyone can report a user.
 
-It also covers what a real service needs: requested time and payment method, automatic expiry of unanswered requests, an installable app with push notifications, a safety screen (emergency call, share job details), password reset by SMS, and an admin queue for reports and suspensions.
+It also covers what a real service needs: requested time and payment method, automatic expiry of unanswered requests, an installable app with push notifications, a worker "go online" mode that pushes nearby matching jobs, a safety screen (emergency call, share job details), password reset by SMS, and an admin queue for reports and suspensions.
 
 ---
 
@@ -130,6 +130,7 @@ Test suites cover:
 - Feed, Nearby Search, Offers/Counter-Offers & Race-Condition Safe Hiring (`jobs.test.ts`)
 - Arrival Flow, Contact & Location Privacy, Back-Outs, Profiles & Reports (`marketplace.test.ts`)
 - Scheduling, Expiry, Web Push, Password Reset & Moderation (`operations.test.ts`)
+- Worker Online Mode & Nearby Job Alerts (`dispatch.test.ts`)
 - Lifecycle Status Transitions & Personal List (`transitions.test.ts`)
 - Direct Scoped Chat & Realtime WebSocket Delivery (`messages.test.ts`)
 - Post-Completion Ratings & Averages (`ratings.test.ts`)

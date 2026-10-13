@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { SocketProvider, useSocket } from './context/SocketContext';
+import { AvailabilityProvider } from './context/AvailabilityContext';
 import { Navbar, NavView } from './components/Navbar';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -127,7 +128,7 @@ function MainApp() {
         />
       )}
 
-      <NotificationCenter onOpenJob={openJob} openJobId={selectedJobId} />
+      <NotificationCenter onOpenJob={openJob} openJobId={selectedJobId} currentView={currentView} />
 
       <footer className="relative z-10 border-t border-slate-800/80 bg-slate-950/90 py-4">
         <div className="w-full px-4 sm:px-6 lg:px-8 xl:px-10 flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-slate-500">
@@ -146,7 +147,9 @@ export function App() {
   return (
     <AuthProvider>
       <SocketProvider>
-        <MainApp />
+        <AvailabilityProvider>
+          <MainApp />
+        </AvailabilityProvider>
       </SocketProvider>
     </AuthProvider>
   );

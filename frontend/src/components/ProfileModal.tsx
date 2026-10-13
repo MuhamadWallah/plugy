@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { X, Star, ShieldCheck, Briefcase, CalendarDays, RefreshCw } from 'lucide-react';
 import { memberSince, relativeTime } from '../utils/format';
 import { Portal } from './Portal';
+import { categoryName } from '../utils/categories';
 
 interface PublicProfile {
   id: string;
@@ -13,6 +14,7 @@ interface PublicProfile {
   member_since: string;
   jobs_completed: number;
   jobs_posted: number;
+  work_categories?: string[];
 }
 
 interface Review {
@@ -85,6 +87,16 @@ export const ProfileSummary: React.FC<{ userId: string; compact?: boolean }> = (
           </div>
         </div>
       </div>
+
+      {profile.work_categories && profile.work_categories.length > 0 && (
+        <div className="flex flex-wrap gap-1.5" aria-label="Works in">
+          {profile.work_categories.map((slug) => (
+            <span key={slug} className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-500/10 text-emerald-300 border border-emerald-500/20">
+              {categoryName(slug)}
+            </span>
+          ))}
+        </div>
+      )}
 
       <div className="grid grid-cols-3 gap-2 text-center">
         <div className="p-3 rounded-2xl bg-slate-950 border border-slate-800">

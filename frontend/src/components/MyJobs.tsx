@@ -363,7 +363,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
         >
           <div>
             <span className="text-[10px] font-black uppercase tracking-wider text-slate-400 block mb-1">
-              Total Contracts
+              Total jobs
             </span>
             <div className="text-2xl font-black text-white group-hover:text-emerald-400 transition-colors">
               {metrics.total}
@@ -567,7 +567,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
       ) : loading ? (
         <div className="py-16 text-center space-y-3">
           <div className="w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto"></div>
-          <p className="text-xs text-slate-400">Loading personal contracts...</p>
+          <p className="text-xs text-slate-400">Loading your jobs…</p>
         </div>
       ) : filteredJobs.length === 0 ? (
         <div className="p-16 text-center rounded-3xl bg-slate-900/40 border border-slate-800/80 space-y-4 max-w-lg mx-auto">
@@ -575,9 +575,9 @@ export const MyJobs: React.FC<MyJobsProps> = ({
             <Briefcase className="w-8 h-8" />
           </div>
           <div>
-            <h3 className="text-base font-bold text-white">No contracts found</h3>
+            <h3 className="text-base font-bold text-white">No jobs here yet</h3>
             <p className="text-xs text-slate-400 mt-1">
-              You don&apos;t have any jobs matching this filter. You can post a task or accept an open job from the live board.
+              Post a job and get offers, or find a job nearby and send an offer.
             </p>
           </div>
           <div className="flex items-center justify-center gap-3 pt-2">
@@ -598,7 +598,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
               }}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition cursor-pointer"
             >
-              Browse Open Jobs
+              Find jobs nearby
             </button>
           </div>
         </div>

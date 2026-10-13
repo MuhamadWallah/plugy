@@ -19,6 +19,7 @@ import {
   broadcastJobUpdated,
 } from '../sockets/socket.js';
 import { notify } from '../services/notify.service.js';
+import { alertNearbyWorkersInBackground } from '../services/dispatch.service.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -225,8 +226,10 @@ export const createJob = async (req: Request, res: Response) => {
 
     const jobId = insertResult.rows[0].id;
 
-    // Broadcast the public version of the new job to all live feed listeners
+    // Broadcast the public version of the new job to all live feed listeners,
+    // and push it to online workers nearby who do this kind of work
     broadcastJobCreated(await fetchJobView(jobId));
+    alertNearbyWorkersInBackground(jobId);
 
     return res.status(201).json({
       message: 'Job posted successfully',
@@ -762,6 +765,7 @@ export const releaseJob = async (req: Request, res: Response) => {
     const publicJob = await fetchJobView(ctx.id);
     broadcastJobStatusUpdated({ jobId: ctx.id, status: 'open', job: publicJob });
     broadcastJobReopened({ jobId: ctx.id, job: publicJob });
+    alertNearbyWorkersInBackground(ctx.id);
 
     notify(
       ctx.posterId,

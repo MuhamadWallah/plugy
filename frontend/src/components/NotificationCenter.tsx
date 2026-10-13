@@ -20,10 +20,11 @@ let nextId = 1;
  * Private, per-user alerts (new offers, hired, declined, worker backed out, job cancelled).
  * In-app toasts while the tab is visible, system notifications while it is in the background.
  */
-export const NotificationCenter: React.FC<{ onOpenJob: (jobId: string) => void; openJobId?: string | null }> = ({
-  onOpenJob,
-  openJobId,
-}) => {
+export const NotificationCenter: React.FC<{
+  onOpenJob: (jobId: string) => void;
+  openJobId?: string | null;
+  currentView?: string;
+}> = ({ onOpenJob, openJobId, currentView }) => {
   const { socket } = useSocket();
   const { user } = useAuth();
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -106,7 +107,19 @@ export const NotificationCenter: React.FC<{ onOpenJob: (jobId: string) => void; 
         body: `"${d.jobTitle ?? 'Your job'}" expired without a hire. Post it again, perhaps with a higher price.`,
       });
 
+    const onNearby = (d: { jobId: string; jobTitle?: string; categoryName?: string; budget?: string | null; distanceKm?: number }) => {
+      if (currentView === 'feed' && !document.hidden) return; // the live feed already shows it
+      const km = d.distanceKm ?? null;
+      push({
+        jobId: d.jobId,
+        tone: 'offer',
+        title: `New job near you${d.budget ? ` · ${formatMoney(d.budget)}` : ''}`,
+        body: `${d.categoryName ? `${d.categoryName}: ` : ''}"${d.jobTitle ?? 'New job'}"${km !== null ? `, ${km < 1 ? 'under 1 km' : `${km} km`} away` : ''}`,
+      });
+    };
+
     socket.on('offer:new', onOfferNew);
+    socket.on('job:nearby', onNearby);
     socket.on('job:progress', onProgress);
     socket.on('job:expired', onExpired);
     socket.on('offer:accepted', onHired);
@@ -115,6 +128,7 @@ export const NotificationCenter: React.FC<{ onOpenJob: (jobId: string) => void; 
     socket.on('job:cancelled', onCancelled);
     return () => {
       socket.off('offer:new', onOfferNew);
+      socket.off('job:nearby', onNearby);
       socket.off('job:progress', onProgress);
       socket.off('job:expired', onExpired);
       socket.off('offer:accepted', onHired);
@@ -122,7 +136,7 @@ export const NotificationCenter: React.FC<{ onOpenJob: (jobId: string) => void; 
       socket.off('job:released', onReleased);
       socket.off('job:cancelled', onCancelled);
     };
-  }, [socket, user, push, openJobId]);
+  }, [socket, user, push, openJobId, currentView]);
 
   if (toasts.length === 0) return null;
 

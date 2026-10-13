@@ -56,6 +56,11 @@ const suspendUser = async (userId: string, adminId: string, reason: string) => {
     );
     if (updated.rowCount === 0) return null;
 
+    await client.query(
+      `UPDATE worker_availability SET is_available = FALSE, available_until = NULL, updated_at = NOW() WHERE user_id = $1`,
+      [userId]
+    );
+
     const cancelledJobs = await client.query(
       `UPDATE jobs SET status = 'cancelled', cancelled_at = NOW(), cancel_reason = 'Account suspended', updated_at = NOW()
        WHERE poster_id = $1 AND status = 'open' RETURNING id`,

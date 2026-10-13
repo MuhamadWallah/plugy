@@ -5,7 +5,7 @@ import { env, isOriginAllowed } from './config/env.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.routes.js';
 import jobRouter from './routes/job.routes.js';
-import { adminRouter, offerRouter, userRouter } from './routes/user.routes.js';
+import { adminRouter, offerRouter, userRouter, workerRouter } from './routes/user.routes.js';
 import { configRouter, pushRouter } from './routes/system.routes.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 import { initPush } from './services/push.service.js';
@@ -51,6 +51,7 @@ export const createApp = (): Express => {
   app.use('/api/jobs', jobRouter);
   app.use('/api/offers', offerRouter);
   app.use('/api/users', userRouter);
+  app.use('/api/workers', workerRouter);
   app.use('/api/admin', adminRouter);
   app.use('/api/config', configRouter);
   app.use('/api/push', pushRouter);

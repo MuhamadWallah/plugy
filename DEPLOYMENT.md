@@ -159,7 +159,7 @@ Registration requires a verified phone number. In production the code is deliver
 
 ## 4c. Push notifications and the installable app
 
-Plugy is an installable web app ("Add to Home Screen"). With push enabled, users get alerts for new offers, being hired, "worker on the way / arrived", completed jobs and chat messages, even when Plugy is closed.
+Plugy is an installable web app ("Add to Home Screen"). With push enabled, users get alerts for new offers, being hired, "worker on the way / arrived", completed jobs and chat messages, and workers who are **online** get new matching jobs near them, even when Plugy is closed.
 
 1. Generate a key pair **once** and keep it forever. Changing keys makes every device re-subscribe the next time it opens Plugy.
    ```bash
