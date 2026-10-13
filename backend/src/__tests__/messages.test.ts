@@ -6,6 +6,7 @@ import { io as Client, Socket as ClientSocket } from 'socket.io-client';
 import { createApp } from '../app.js';
 import { query } from '../config/db.js';
 import { initSocketServer } from '../sockets/socket.js';
+import { hireWorker } from './helpers.js';
 
 const app = createApp();
 
@@ -21,7 +22,21 @@ describe('Job Chat & Messages API (Step 6)', () => {
 
   let server: http.Server;
   let serverPort: number;
-  let socketClient: ClientSocket;
+  const socketClients: ClientSocket[] = [];
+
+  // Connects a Socket.IO client, optionally authenticated with a session cookie
+  const connectSocket = async (cookie?: string): Promise<ClientSocket> => {
+    const client = Client(`http://localhost:${serverPort}`, {
+      transports: ['websocket'],
+      extraHeaders: cookie ? { Cookie: cookie } : undefined,
+    });
+    socketClients.push(client);
+    await new Promise<void>((resolve) => client.on('connect', () => resolve()));
+    return client;
+  };
+
+  const joinJobRoom = (client: ClientSocket, id: string) =>
+    new Promise<{ ok: boolean; error?: string }>((resolve) => client.emit('join:job', id, resolve));
 
   beforeAll(async () => {
     // Start HTTP & Socket.IO server on dynamic port
@@ -87,16 +102,11 @@ describe('Job Chat & Messages API (Step 6)', () => {
     jobId = jobRes.body.job.id;
 
     // 5. Worker accepts the job
-    await request(app)
-      .post(`/api/jobs/${jobId}/accept`)
-      .set('Cookie', workerCookie)
-      .send();
+    await hireWorker(app, jobId, posterCookie, workerCookie);
   });
 
   afterAll(async () => {
-    if (socketClient) {
-      socketClient.disconnect();
-    }
+    socketClients.forEach((client) => client.disconnect());
     if (server) {
       await new Promise<void>((resolve) => server.close(() => resolve()));
     }
@@ -194,20 +204,15 @@ describe('Job Chat & Messages API (Step 6)', () => {
 
   describe('Realtime WebSocket Delivery Scoped to Job Room', () => {
     it('delivers new messages in realtime over WebSocket to clients in job room', async () => {
-      socketClient = Client(`http://localhost:${serverPort}`, {
-        transports: ['websocket'],
-      });
-
-      await new Promise<void>((resolve) => {
-        socketClient.on('connect', () => resolve());
-      });
+      const socketClient = await connectSocket(workerCookie);
 
       // Join the job's dedicated room
-      socketClient.emit('join:job', jobId);
+      const joinResult = await joinJobRoom(socketClient, jobId);
+      expect(joinResult).toEqual({ ok: true });
 
       // Listen for message:new
       const messagePromise = new Promise<{ id: string; body: string; job_id: string }>((resolve) => {
-        socketClient.on('message:new', (msg) => {
+        socketClient.on('message:new', (msg: { id: string; body: string; job_id: string }) => {
           resolve(msg);
         });
       });
@@ -222,6 +227,53 @@ describe('Job Chat & Messages API (Step 6)', () => {
       expect(received).toBeDefined();
       expect(received.body).toBe('Realtime delivery test via WebSocket room!');
       expect(received.job_id).toBe(jobId);
+    });
+
+    it('refuses job room access to bystanders and anonymous sockets, so they never receive chat messages', async () => {
+      const bystanderSocket = await connectSocket(bystanderCookie);
+      const anonymousSocket = await connectSocket();
+
+      expect(await joinJobRoom(bystanderSocket, jobId)).toEqual({ ok: false, error: 'Forbidden' });
+      expect(await joinJobRoom(anonymousSocket, jobId)).toEqual({ ok: false, error: 'Authentication required' });
+
+      const leaked: unknown[] = [];
+      bystanderSocket.on('message:new', (msg: unknown) => leaked.push(msg));
+      anonymousSocket.on('message:new', (msg: unknown) => leaked.push(msg));
+
+      // A participant in the room confirms the message was actually broadcast
+      const posterSocket = await connectSocket(posterCookie);
+      expect(await joinJobRoom(posterSocket, jobId)).toEqual({ ok: true });
+      const delivered = new Promise((resolve) => posterSocket.on('message:new', resolve));
+
+      await request(app)
+        .post(`/api/jobs/${jobId}/messages`)
+        .set('Cookie', posterCookie)
+        .send({ body: 'Private message for participants only' });
+
+      await delivered;
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      expect(leaked).toHaveLength(0);
+    });
+
+    it('relays live location from the hired worker to the job room, and refuses anyone else', async () => {
+      const posterSocket = await connectSocket(posterCookie);
+      expect(await joinJobRoom(posterSocket, jobId)).toEqual({ ok: true });
+      const received = new Promise<{ jobId: string; lat: number; lng: number }>((resolve) =>
+        posterSocket.on('job:location', resolve)
+      );
+
+      const sendLocation = (client: ClientSocket, payload: unknown) =>
+        new Promise<{ ok: boolean; error?: string }>((resolve) => client.emit('location:update', payload, resolve));
+
+      const bystanderSocket = await connectSocket(bystanderCookie);
+      expect(await sendLocation(bystanderSocket, { jobId, lat: -17.8, lng: 31.0 })).toEqual({ ok: false, error: 'Forbidden' });
+
+      const workerSocket = await connectSocket(workerCookie);
+      expect(await sendLocation(workerSocket, { jobId, lat: 999, lng: 31.0 })).toEqual({ ok: false, error: 'Invalid location payload' });
+      expect(await sendLocation(workerSocket, { jobId, lat: -17.81, lng: 31.04, accuracy: 12.7 })).toEqual({ ok: true });
+
+      const location = await received;
+      expect(location).toMatchObject({ jobId, lat: -17.81, lng: 31.04, accuracy: 13 });
     });
   });
 

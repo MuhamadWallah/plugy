@@ -25,3 +25,12 @@ export const signToken = (payload: JwtPayload): string => {
 export const verifyToken = (token: string): JwtPayload => {
   return jwt.verify(token, JWT_SECRET) as JwtPayload;
 };
+
+/**
+ * A session is revoked when it was issued before the user's last password change
+ * (e.g. a password reset signs out every other device).
+ */
+export const isSessionRevoked = (payload: JwtPayload, passwordChangedAt: Date | string | null | undefined): boolean => {
+  if (!passwordChangedAt || payload.iat === undefined) return false;
+  return payload.iat < Math.floor(new Date(passwordChangedAt).getTime() / 1000);
+};

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import { query } from '../config/db.js';
+import { hireWorker } from './helpers.js';
 
 const app = createApp();
 
@@ -93,9 +94,7 @@ describe('Job Ratings API (Step 7)', () => {
 
     it('rejects rating when job is "accepted"', async () => {
       // Worker accepts
-      await request(app)
-        .post(`/api/jobs/${jobId}/accept`)
-        .set('Cookie', workerCookie);
+      await hireWorker(app, jobId, posterCookie, workerCookie);
 
       const res = await request(app)
         .post(`/api/jobs/${jobId}/rate`)
@@ -247,7 +246,7 @@ describe('Job Ratings API (Step 7)', () => {
         });
       job2Id = j2.body.job.id;
 
-      await request(app).post(`/api/jobs/${job2Id}/accept`).set('Cookie', workerCookie);
+      await hireWorker(app, job2Id, posterCookie, workerCookie);
       await request(app).post(`/api/jobs/${job2Id}/complete`).set('Cookie', posterCookie);
 
       // Rate worker with score 4
@@ -279,7 +278,7 @@ describe('Job Ratings API (Step 7)', () => {
         });
       job3Id = j3.body.job.id;
 
-      await request(app).post(`/api/jobs/${job3Id}/accept`).set('Cookie', workerCookie);
+      await hireWorker(app, job3Id, posterCookie, workerCookie);
       await request(app).post(`/api/jobs/${job3Id}/complete`).set('Cookie', workerCookie);
 
       // Rate worker with score 2

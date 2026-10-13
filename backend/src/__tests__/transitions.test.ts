@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import request from 'supertest';
 import { createApp } from '../app.js';
 import { query } from '../config/db.js';
+import { hireWorker } from './helpers.js';
 
 const app = createApp();
 
@@ -74,10 +75,8 @@ describe('Job Lifecycle Status Transitions & Personal List (Step 5)', () => {
 
     const jobId = jobRes.body.job.id;
 
-    await request(app)
-      .post(`/api/jobs/${jobId}/accept`)
-      .set('Cookie', workerCookie)
-      .expect(200);
+    const hired = await hireWorker(app, jobId, posterCookie, workerCookie);
+    expect(hired.status).toBe(200);
 
     return jobId;
   };

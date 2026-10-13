@@ -25,3 +25,21 @@ pool.on('error', (err) => {
 });
 
 export const query = (text: string, params?: unknown[]) => pool.query(text, params);
+
+/**
+ * Runs `fn` inside a transaction on a dedicated client (COMMIT on success, ROLLBACK on error).
+ */
+export const withTransaction = async <T>(fn: (client: pg.PoolClient) => Promise<T>): Promise<T> => {
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+};

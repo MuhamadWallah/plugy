@@ -17,6 +17,20 @@ export const authRateLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter for offers (bids) so workers can't flood customers.
+ */
+export const offerRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: env.RATE_LIMIT_ENABLED ? env.RATE_LIMIT_OFFERS_MAX : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many offers sent. Please wait a few minutes before sending more.',
+  },
+  skip: () => !env.RATE_LIMIT_ENABLED,
+});
+
+/**
  * Rate limiter for job creation to prevent spam and board flooding.
  */
 export const jobPostRateLimiter = rateLimit({

@@ -1,26 +1,36 @@
 import express, { Express } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
-import { env } from './config/env.js';
+import { env, isOriginAllowed } from './config/env.js';
 import healthRouter from './routes/health.js';
 import authRouter from './routes/auth.routes.js';
 import jobRouter from './routes/job.routes.js';
+import { adminRouter, offerRouter, userRouter } from './routes/user.routes.js';
+import { configRouter, pushRouter } from './routes/system.routes.js';
 import { requireAuth } from './middleware/auth.middleware.js';
+import { initPush } from './services/push.service.js';
 import { requestLogger } from './middleware/logger.middleware.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 
 export const createApp = (): Express => {
   const app = express();
 
+  initPush();
+
+  app.disable('x-powered-by');
+
+  // Behind nginx / a load balancer, derive client IP from X-Forwarded-For (used by rate limiting)
+  app.set('trust proxy', env.TRUST_PROXY);
+
   // 1. CORS Policy
   app.use(
     cors({
       origin: (origin, callback) => {
         // In development/test allow all origins or null origin (mobile apps, curl, server-to-server)
-        if (!env.isProduction || !origin || origin === env.CORS_ORIGIN) {
+        if (isOriginAllowed(origin)) {
           callback(null, true);
         } else {
-          callback(new Error('CORS origin denied by policy'));
+          callback(Object.assign(new Error(`Origin ${origin} is not allowed by CORS policy`), { status: 403 }));
         }
       },
       credentials: true,
@@ -39,6 +49,11 @@ export const createApp = (): Express => {
   app.use('/api/health', healthRouter);
   app.use('/api/auth', authRouter);
   app.use('/api/jobs', jobRouter);
+  app.use('/api/offers', offerRouter);
+  app.use('/api/users', userRouter);
+  app.use('/api/admin', adminRouter);
+  app.use('/api/config', configRouter);
+  app.use('/api/push', pushRouter);
 
   // Dedicated protected endpoint for testing middleware auth rejection
   app.get('/api/protected-test', requireAuth, (req, res) => {

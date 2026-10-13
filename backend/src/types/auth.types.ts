@@ -11,15 +11,20 @@ export interface User {
   rating_count: number;
   created_at: string | Date;
   updated_at?: string | Date;
+  /** Derived from ADMIN_EMAILS; never stored */
+  is_admin?: boolean;
 }
 
 export interface UserWithPassword extends User {
   password_hash: string;
+  suspended_at?: string | Date | null;
 }
 
 export interface JwtPayload {
   userId: string;
   email: string;
+  /** Issued-at (seconds), added by jsonwebtoken */
+  iat?: number;
 }
 
 export interface AuthenticatedRequest extends Request {

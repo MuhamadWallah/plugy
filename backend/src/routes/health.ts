@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { query } from '../config/db.js';
+import { env } from '../config/env.js';
 
 const router = Router();
 
@@ -31,7 +32,10 @@ router.get('/', async (_req: Request, res: Response) => {
       timestamp: new Date().toISOString(),
       database: {
         connected: false,
-        error: error instanceof Error ? error.message : 'Unknown database error',
+        // Driver errors can include hostnames/usernames; only expose them outside production
+        error: env.isProduction
+          ? 'Database unavailable'
+          : error instanceof Error ? error.message : 'Unknown database error',
       },
     });
   }

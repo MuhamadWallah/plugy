@@ -37,7 +37,8 @@ describe('Authentication API & Protected Routes', () => {
       expect(response.body.user).toMatchObject({
         name: testUser.name,
         email: testUser.email,
-        phone: testUser.phone,
+        // Stored in normalized form (spaces, hyphens, parentheses stripped)
+        phone: '+15550199',
       });
       // Ensure password_hash is NEVER leaked
       expect(response.body.user).not.toHaveProperty('password_hash');

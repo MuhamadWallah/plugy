@@ -67,6 +67,15 @@ export const loginSchema = z.object({
     .min(1, 'Password is required'),
 });
 
+export const passwordResetRequestSchema = sendOtpSchema;
+
+export const passwordResetConfirmSchema = verifyOtpSchema.extend({
+  password: z
+    .string()
+    .min(6, 'Password must be at least 6 characters')
+    .max(128, 'Password cannot exceed 128 characters'),
+});
+
 export type SendOtpInput = z.infer<typeof sendOtpSchema>;
 export type VerifyOtpInput = z.infer<typeof verifyOtpSchema>;
 export type RegisterInput = z.infer<typeof registerSchema>;

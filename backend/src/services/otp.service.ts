@@ -21,6 +21,7 @@ export class OtpService {
     devOtp?: string;
     retryAfterSeconds?: number;
     error?: string;
+    statusCode?: number;
   }> {
     const phone = this.normalizePhone(rawPhone);
 
@@ -53,14 +54,28 @@ export class OtpService {
     const expires_at = new Date(Date.now() + 10 * 60 * 1000);
 
     // Store in database
-    await query(
+    const inserted = await query(
       `INSERT INTO phone_verifications (phone, code_hash, expires_at)
-       VALUES ($1, $2, $3)`,
+       VALUES ($1, $2, $3)
+       RETURNING id`,
       [phone, code_hash, expires_at]
     );
 
     // Dispatch SMS notification
-    await this.dispatchSms(phone, otp);
+    const delivered = await this.dispatchSms(phone, otp);
+
+    // In production the code is only ever delivered by SMS, so a failed send must not look like success.
+    // Remove the record so the 60-second cooldown doesn't block an immediate retry.
+    if (env.isProduction && !delivered) {
+      await query('DELETE FROM phone_verifications WHERE id = $1', [inserted.rows[0].id]);
+      return {
+        success: false,
+        message: 'Unable to send the verification SMS right now. Please try again shortly.',
+        error: 'Unable to send the verification SMS right now. Please try again shortly.',
+        phone,
+        statusCode: 503,
+      };
+    }
 
     const isDevOrTest = env.NODE_ENV !== 'production';
 
@@ -137,51 +152,72 @@ export class OtpService {
   }
 
   /**
-   * Dispatches SMS message via Twilio if configured, or logs to console
+   * Whether real SMS delivery (Twilio) is configured
    */
-  private async dispatchSms(phone: string, otp: string): Promise<void> {
+  public isSmsConfigured(): boolean {
+    return Boolean(
+      process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN && process.env.TWILIO_PHONE_NUMBER
+    );
+  }
+
+  /**
+   * Dispatches SMS message via Twilio if configured, or logs to console.
+   * Returns true only when the SMS provider accepted the message.
+   */
+  private async dispatchSms(phone: string, otp: string): Promise<boolean> {
     const accountSid = process.env.TWILIO_ACCOUNT_SID;
     const authToken = process.env.TWILIO_AUTH_TOKEN;
     const fromPhone = process.env.TWILIO_PHONE_NUMBER;
 
     const messageText = `Your Plugy verification code is: ${otp}. It expires in 10 minutes. Do not share this code.`;
 
-    // Console notification (guarantees local dev & test observability)
-    console.log(`\n======================================================`);
-    console.log(`📱 [SMS OTP DISPATCH]`);
-    console.log(`To:      ${phone}`);
-    console.log(`Code:    ${otp}`);
-    console.log(`Message: ${messageText}`);
-    console.log(`======================================================\n`);
+    // Console notification for local dev & test observability (never log live codes in production)
+    if (!env.isProduction) {
+      console.log(`\n======================================================`);
+      console.log(`📱 [SMS OTP DISPATCH]`);
+      console.log(`To:      ${phone}`);
+      console.log(`Code:    ${otp}`);
+      console.log(`Message: ${messageText}`);
+      console.log(`======================================================\n`);
+    }
 
-    if (accountSid && authToken && fromPhone) {
-      try {
-        const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-        const bodyParams = new URLSearchParams({
-          To: phone,
-          From: fromPhone,
-          Body: messageText,
-        });
-
-        const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
-        const res = await fetch(twilioUrl, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Basic ${credentials}`,
-            'Content-Type': 'application/x-www-form-urlencoded',
-          },
-          body: bodyParams.toString(),
-        });
-
-        if (!res.ok) {
-          const errBody = await res.text();
-          console.warn('[Twilio SMS Error]:', errBody);
-        } else {
-          console.log(`[Twilio SMS Sent Successfully] to ${phone}`);
-        }
-      } catch (err) {
-        console.error('[SMS Provider Dispatch Failed]:', err);
+    if (!accountSid || !authToken || !fromPhone) {
+      if (env.isProduction) {
+        console.error('[SMS] Cannot send verification code: TWILIO_* environment variables are not configured.');
       }
+      return false;
+    }
+
+    try {
+      const twilioUrl = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
+      const bodyParams = new URLSearchParams({
+        To: phone,
+        From: fromPhone,
+        Body: messageText,
+      });
+
+      const credentials = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+      const res = await fetch(twilioUrl, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Basic ${credentials}`,
+          'Content-Type': 'application/x-www-form-urlencoded',
+        },
+        body: bodyParams.toString(),
+        signal: AbortSignal.timeout(10000),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.text();
+        console.warn('[Twilio SMS Error]:', errBody);
+        return false;
+      }
+
+      console.log(`[Twilio SMS Sent Successfully] to ${phone}`);
+      return true;
+    } catch (err) {
+      console.error('[SMS Provider Dispatch Failed]:', err);
+      return false;
     }
   }
 }
