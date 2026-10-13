@@ -9,6 +9,7 @@ export interface User {
   rating_count: number;
   created_at: string;
   updated_at?: string;
+  id_verified?: boolean;
   /** Can review reports and suspend accounts */
   is_admin?: boolean;
 }

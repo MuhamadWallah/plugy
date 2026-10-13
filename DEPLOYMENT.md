@@ -82,6 +82,12 @@ docker compose -f docker-compose.prod.yml --env-file .env.production exec -T pos
 
 The data lives in the Docker volume `plugy_prod_pgdata`. Schedule the dump (cron) and copy it off the host.
 
+Photos and ID documents live in the volume `plugy_prod_uploads`; back it up alongside the database:
+
+```bash
+docker run --rm -v plugy_prod_uploads:/data -v "$PWD":/backup alpine tar czf /backup/plugy-uploads-$(date +%F).tgz -C /data .
+```
+
 ---
 
 ## 3. HTTPS
@@ -179,6 +185,8 @@ Notes:
 - **Safety screen:** shows a call button for `EMERGENCY_NUMBER` (default `112`, which works from most mobile networks). Set your country's number if different.
 - **Request expiry:** open requests close automatically when nobody is hired: "as soon as possible" requests after `JOB_OPEN_HOURS` (default 72), scheduled ones two hours after their requested time. The customer is notified and can repost.
 - **Password reset** uses an SMS code to the verified phone number (Twilio, see §4) and signs out every other device.
+- **ID verification:** workers submit a photo of their ID and a selfie from **My profile**. Admins review them under **Reports → ID checks** and approve or reject (with a reason the worker sees). Approved workers show an **ID verified** badge. Jobs in `ID_REQUIRED_CATEGORIES` (default babysitting and care taking) accept offers, and send alerts, only to verified workers. ID files are stored in the private part of the uploads volume and are only served to admins; they are kept for audit, so include them in your data-retention policy.
+- **Photos:** every upload (profile photos, up to 4 job photos, ID documents) is decoded and re-encoded server-side, which drops embedded metadata such as phone GPS coordinates, and is capped at 10 MB.
 
 ---
 
@@ -205,6 +213,9 @@ Set these in `.env.production` (git-ignored). Never commit real values.
 | `ADMIN_EMAILS` | *(empty)* | Accounts that can review reports and suspend users |
 | `EMERGENCY_NUMBER` | `112` | Number on the in-app Safety screen |
 | `JOB_OPEN_HOURS` | `72` | Hours before an unanswered "as soon as possible" request expires |
+| `ID_REQUIRED_CATEGORIES` | `babysitting,care_taking` | Kinds of work that need an approved ID to offer (empty to disable) |
+| `RATE_LIMIT_UPLOADS_MAX` | `40` | Photo uploads per IP per 15 minutes |
+| `UPLOAD_DIR` | `/data/uploads` (production image) | Where photos and ID documents are stored; mounted as the `uploads` volume |
 | `RUN_MIGRATIONS` | `true` | Run migrations on backend start. Set `false` if a release step runs `npm run migrate:up` |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | *(empty)* | SMS delivery (see §4) |
 

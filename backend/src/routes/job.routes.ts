@@ -28,7 +28,9 @@ import {
   getJobRatings
 } from '../controllers/rating.controller.js';
 import { optionalAuth, requireAuth } from '../middleware/auth.middleware.js';
-import { jobPostRateLimiter, offerRateLimiter } from '../middleware/rateLimit.middleware.js';
+import { jobPostRateLimiter, offerRateLimiter, uploadRateLimiter } from '../middleware/rateLimit.middleware.js';
+import { addJobPhoto, deleteJobPhoto } from '../controllers/media.controller.js';
+import { acceptImages } from '../services/upload.service.js';
 
 const router = Router();
 
@@ -40,6 +42,8 @@ router.get('/mine', requireAuth, getMyJobs);
 router.post('/', requireAuth, jobPostRateLimiter, createJob);
 router.get('/:id', optionalAuth, getJobById);
 router.patch('/:id/budget', requireAuth, raiseBudget);
+router.post('/:id/photos', requireAuth, uploadRateLimiter, acceptImages(['photo']), addJobPhoto);
+router.delete('/:id/photos/:photoId', requireAuth, deleteJobPhoto);
 
 // Offers: workers accept the price or counter-offer, the poster chooses
 router.get('/:id/offers', requireAuth, listOffers);

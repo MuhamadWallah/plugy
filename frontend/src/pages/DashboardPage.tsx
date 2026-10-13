@@ -3,6 +3,8 @@ import { Mail, Phone, ShieldCheck, ShieldAlert, Briefcase, HandMetal } from 'luc
 import { useAuth } from '../context/AuthContext';
 import { ProfileSummary } from '../components/ProfileModal';
 import { NotificationSettings } from '../components/NotificationSettings';
+import { ProfilePhotoControl } from '../components/ProfilePhotoControl';
+import { VerificationCard } from '../components/VerificationCard';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -13,9 +15,12 @@ export const DashboardPage: React.FC = () => {
     <div className="space-y-6">
       <section className="p-5 sm:p-6 rounded-3xl bg-slate-900/80 border border-slate-800 space-y-4">
         <h1 className="text-lg font-black text-white">Your profile</h1>
-        <p className="text-xs text-slate-400 -mt-2">This is what customers and workers see when they view your profile.</p>
-        <ProfileSummary userId={user.id} />
+        <ProfilePhotoControl />
+        <p className="text-xs text-slate-400 pt-2 border-t border-slate-800">This is what customers and workers see when they view your profile:</p>
+        <ProfileSummary key={user.avatar_url ?? 'none'} userId={user.id} />
       </section>
+
+      <VerificationCard />
 
       <NotificationSettings />
 

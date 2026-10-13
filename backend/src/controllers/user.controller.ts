@@ -17,6 +17,7 @@ export const getUserProfile = async (req: Request, res: Response) => {
 
     const profileResult = await query(
       `SELECT u.id, u.name, u.avatar_url, u.rating_avg, u.rating_count, u.phone_verified,
+         (u.id_verified_at IS NOT NULL) AS id_verified,
          u.created_at AS member_since,
          (SELECT COUNT(*)::int FROM jobs WHERE worker_id = u.id AND status = 'completed') AS jobs_completed,
          (SELECT COUNT(*)::int FROM jobs WHERE poster_id = u.id) AS jobs_posted,

@@ -4,6 +4,7 @@ import { offerSchema } from '../validators/job.validator.js';
 import { OFFER_SELECT, fetchJobView, fetchOffer } from '../services/jobView.service.js';
 import { broadcastJobAccepted, notifyUser } from '../sockets/socket.js';
 import { notify } from '../services/notify.service.js';
+import { env } from '../config/env.js';
 
 const money = (value: unknown) => `$${Number(value).toFixed(2)}`;
 
@@ -41,7 +42,7 @@ export const submitOffer = async (req: Request, res: Response) => {
     const { price, message, eta_minutes } = parsed.data;
     const workerId = req.user.id;
 
-    const jobResult = await query('SELECT poster_id, status, title FROM jobs WHERE id = $1', [jobId]);
+    const jobResult = await query('SELECT poster_id, status, title, category_slug FROM jobs WHERE id = $1', [jobId]);
     if (jobResult.rows.length === 0) {
       return res.status(404).json({ error: 'Job not found' });
     }
@@ -52,6 +53,17 @@ export const submitOffer = async (req: Request, res: Response) => {
     }
     if (job.status !== 'open') {
       return res.status(409).json({ error: 'This job is no longer accepting offers' });
+    }
+
+    // Childcare and care work: only workers with a verified ID can offer
+    if (env.ID_REQUIRED_CATEGORIES.includes(job.category_slug)) {
+      const verified = await query('SELECT id_verified_at IS NOT NULL AS ok FROM users WHERE id = $1', [workerId]);
+      if (!verified.rows[0]?.ok) {
+        return res.status(403).json({
+          error: 'Jobs in this category need a verified ID. Verify your ID from your profile to make offers.',
+          code: 'id_verification_required',
+        });
+      }
     }
 
     // Insert or update the worker's single offer, only while the job is still open.

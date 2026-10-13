@@ -32,7 +32,7 @@ const resolveSessionUser = async (req: Request): Promise<SessionResult> => {
 
   const { rows } = await query(
     `SELECT id, name, email, phone, phone_verified, avatar_url, rating_avg, rating_count, created_at, updated_at,
-            password_changed_at, suspended_at
+            (id_verified_at IS NOT NULL) AS id_verified, password_changed_at, suspended_at
      FROM users
      WHERE id = $1`,
     [payload.userId]

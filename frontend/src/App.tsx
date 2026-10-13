@@ -23,6 +23,11 @@ function MainApp() {
   // Deep links from notifications: /?job=<id>[&tab=chat]
   const openFromUrl = useCallback((href: string) => {
     const url = new URL(href, window.location.origin);
+    if (url.searchParams.get('view') === 'profile') {
+      setSelectedJobId(null);
+      setCurrentView('dashboard');
+      return;
+    }
     const jobId = url.searchParams.get('job');
     if (jobId) {
       setOpenInChat(url.searchParams.get('tab') === 'chat');
@@ -31,15 +36,26 @@ function MainApp() {
   }, []);
 
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).has('job')) {
+    const params = new URLSearchParams(window.location.search);
+    if (params.has('job') || params.has('view')) {
       openFromUrl(window.location.href);
       window.history.replaceState(null, '', window.location.pathname);
     }
     const onMessage = (event: MessageEvent) => {
       if (event.data?.type === 'open-url' && typeof event.data.url === 'string') openFromUrl(event.data.url);
     };
+    // In-app navigation requests (e.g. "Verify my ID" from a job)
+    const onNavigate = (event: Event) => {
+      const view = (event as CustomEvent<NavView>).detail;
+      setSelectedJobId(null);
+      setCurrentView(view);
+    };
+    window.addEventListener('plugy:navigate', onNavigate);
     navigator.serviceWorker?.addEventListener('message', onMessage);
-    return () => navigator.serviceWorker?.removeEventListener('message', onMessage);
+    return () => {
+      navigator.serviceWorker?.removeEventListener('message', onMessage);
+      window.removeEventListener('plugy:navigate', onNavigate);
+    };
   }, [openFromUrl]);
 
   // When user signs in or registers, switch view back to feed

@@ -99,6 +99,8 @@ This checklist documents everything that has been built, what is intentionally s
 - [x] **Safety screen:** emergency call button (`EMERGENCY_NUMBER`), share job details (who, where, when, status) with someone you trust, report.
 - [x] **Forgot password by SMS code** (no account enumeration); resetting signs out every other session.
 - [x] **Worker online mode:** workers pick the work they do, how far they travel and for how long (auto-off), then go online. New matching jobs within their distance are pushed to them (closest 50 per job), also when a job reopens; their location refreshes from GPS while Plugy is open and is never exposed. Their kinds of work show on their public profile.
+- [x] **Photos:** profile photos and up to 4 job photos (shown on feed cards and in the job, tap to enlarge). Images are shrunk on the phone before upload and re-encoded on the server, stripping metadata such as GPS.
+- [x] **ID verification:** workers submit an ID photo and a selfie; admins review them side by side and approve or reject with a reason. Approved workers carry an **ID verified** badge; babysitting and care jobs (`ID_REQUIRED_CATEGORIES`) take offers and send alerts only to verified workers. ID files are private (admins only).
 - [x] **Moderation:** admins (`ADMIN_EMAILS`) review reports, dismiss or suspend. Suspension blocks sign-in and live connections and takes the user's open jobs and offers off the market; reinstatement supported.
 
 ---
@@ -122,7 +124,7 @@ Before scaling to public commercial users, the following items are simplified or
 
 ## 3. Manual Testing Checklist (Before Showing to Real Users)
 
-The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow, 18/18 for scheduling, safety, password reset, moderation and push, and 8/8 for worker online mode against the dev stack; the hiring flow and push subscription also pass against the production stack.
+The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow, 18/18 for scheduling, safety, password reset, moderation and push, 8/8 for worker online mode and 14/14 for photos and ID verification against the dev stack; the hiring flow, photos/ID verification and push subscription also pass against the production stack.
 
 Open two browser windows (Window 1: normal, Window 2: incognito). Location features need `http://localhost` or HTTPS; allow location access when asked.
 
@@ -165,7 +167,13 @@ Open two browser windows (Window 1: normal, Window 2: incognito). Location featu
 2. Switch to another page (or close Plugy). Have a customer post a matching job nearby: a **New job near you** alert arrives with the price, distance and a link to make an offer.
 3. A job in a kind of work you didn't choose, or outside your distance, sends no alert. **Go offline** stops all alerts.
 
-### Test 8: Things going wrong
+### Test 8: Photos and ID verification
+1. On **My profile**, add a profile photo; it appears in the menu bar, on your offers and on your profile.
+2. Post a babysitting job with two photos; the feed card shows the first photo and the job shows both.
+3. As an unverified worker, the babysitting card says **Verify ID to offer** and leads to **ID verification**. Submit an ID photo and a selfie.
+4. As an admin, open **Reports → ID checks**, compare the photos and **Approve**. The worker is notified and can now offer; the customer sees the **ID verified** badge on the offer.
+
+### Test 9: Things going wrong
 1. Hire Worker B on a new job, then in Worker B's window choose **I can't do this job** with a reason. Customer A is told why, the job is open again, and earlier offers are restored.
 2. Cancel a job from the customer side with a reason; workers who made offers are notified.
 3. Use **Report** on the other party and pick a reason; a second report within 24 hours is refused.

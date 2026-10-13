@@ -25,6 +25,8 @@ import {
   TrendingUp,
   CalendarClock,
   Wallet,
+  ImagePlus,
+  X,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Job, PaymentMethod } from '../types/marketplace';
@@ -32,6 +34,8 @@ import { PAYMENT_METHODS, formatMoney, formatSchedule, paymentLabel } from '../u
 import { LatLng, PlaceResult, getCurrentPosition, reverseGeocode, searchPlaces } from '../utils/geo';
 import { requestNotificationPermission } from '../utils/notify';
 import { MapView } from './MapView';
+import { shrinkImage, uploadImages } from '../utils/image';
+import { MAX_JOB_PHOTOS } from './JobPhotoGallery';
 import { sound } from '../utils/sound';
 
 interface CreateJobFormProps {
@@ -78,6 +82,8 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
   const [isNegotiable, setIsNegotiable] = useState<boolean>(false);
   const [scheduledLocal, setScheduledLocal] = useState<string>(''); // '' = as soon as possible
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('cash');
+  const [photos, setPhotos] = useState<{ file: File; preview: string }[]>([]);
+  const [uploadStatus, setUploadStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -140,6 +146,8 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
     setIsNegotiable(false);
     setScheduledLocal('');
     setPaymentMethod('cash');
+    photos.forEach((p) => URL.revokeObjectURL(p.preview));
+    setPhotos([]);
     setPin(null);
     setLocationText('');
     setLabelEdited(false);
@@ -212,9 +220,24 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
         throw new Error([data.error || 'Failed to post job', details].filter(Boolean).join(': '));
       }
 
+      // Photos are attached after the job exists; a failed photo doesn't lose the job
+      let failedPhotos = 0;
+      for (let i = 0; i < photos.length; i++) {
+        setUploadStatus(`Uploading photo ${i + 1} of ${photos.length}…`);
+        try {
+          await uploadImages(`/api/jobs/${data.job.id}/photos`, { photo: await shrinkImage(photos[i].file, 1600) });
+        } catch {
+          failedPhotos++;
+        }
+      }
+      setUploadStatus(null);
+
       sound.playChime();
       requestNotificationPermission();
       resetForm();
+      if (failedPhotos > 0) {
+        window.alert(`Your job is posted, but ${failedPhotos} photo(s) couldn't be uploaded. You can add them from the job screen.`);
+      }
       onJobCreated?.(data.job);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Error posting job');
@@ -422,6 +445,50 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
             </div>
           </fieldset>
 
+          {/* Photos (optional) */}
+          <fieldset className="space-y-2">
+            <legend className="text-xs font-black text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+              <ImagePlus className="w-3.5 h-3.5 text-emerald-400" /> Photos (optional)
+            </legend>
+            <div className="grid grid-cols-4 gap-2">
+              {photos.map((p, i) => (
+                <div key={p.preview} className="relative aspect-square">
+                  <img src={p.preview} alt="" className="w-full h-full object-cover rounded-xl border border-slate-800" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      URL.revokeObjectURL(p.preview);
+                      setPhotos((prev) => prev.filter((_, j) => j !== i));
+                    }}
+                    className="absolute -top-1.5 -right-1.5 p-1 rounded-full bg-slate-950 border border-slate-700 text-slate-300"
+                    aria-label={`Remove photo ${i + 1}`}
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ))}
+              {photos.length < MAX_JOB_PHOTOS && (
+                <label className="aspect-square rounded-xl border border-dashed border-slate-700 hover:border-emerald-500/60 text-slate-400 hover:text-emerald-300 flex flex-col items-center justify-center gap-1 text-[10px] font-bold cursor-pointer">
+                  <ImagePlus className="w-5 h-5" />
+                  Add photo
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="sr-only"
+                    aria-label="Add job photos"
+                    onChange={(e) => {
+                      const picked = Array.from(e.target.files ?? []).slice(0, MAX_JOB_PHOTOS - photos.length);
+                      e.target.value = '';
+                      setPhotos((prev) => [...prev, ...picked.map((file) => ({ file, preview: URL.createObjectURL(file) }))]);
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+            <p className="text-[11px] text-slate-500">Up to {MAX_JOB_PHOTOS} photos help workers understand the job and price it right.</p>
+          </fieldset>
+
           {/* 5. When */}
           <fieldset className="space-y-2.5">
             <legend className="text-xs font-black text-slate-300 uppercase tracking-wider mb-1 flex items-center gap-1.5">
@@ -545,7 +612,13 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
               disabled={loading || !user}
               className="w-full sm:flex-1 py-3 px-6 rounded-2xl bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-black text-sm flex items-center justify-center gap-2 disabled:opacity-50"
             >
-              {loading ? <RefreshCw className="w-4 h-4 animate-spin" /> : <>Post job and get offers <ArrowRight className="w-4 h-4" /></>}
+              {loading ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" /> {uploadStatus}
+                </>
+              ) : (
+                <>Post job and get offers <ArrowRight className="w-4 h-4" /></>
+              )}
             </button>
             <button
               type="button"

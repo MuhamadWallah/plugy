@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import { formatMoney } from '../utils/format';
 import { showSystemNotification } from '../utils/notify';
 import { sound } from '../utils/sound';
+import { goToProfile } from '../hooks/useIdRequirement';
 
 interface Toast {
   id: number;
@@ -38,7 +39,7 @@ export const NotificationCenter: React.FC<{
       window.setTimeout(() => dismiss(id), 8000);
       if (toast.tone === 'bad') sound.playTap();
       else sound.playChime();
-      showSystemNotification(toast.title, toast.body, () => onOpenJob(toast.jobId));
+      showSystemNotification(toast.title, toast.body, () => (toast.jobId ? onOpenJob(toast.jobId) : goToProfile()));
     },
     [dismiss, onOpenJob]
   );
@@ -99,6 +100,13 @@ export const NotificationCenter: React.FC<{
         body: d.step === 'completed' ? `"${d.jobTitle ?? 'Your job'}" is done. Leave a rating.` : `"${d.jobTitle ?? 'Your job'}"`,
       });
     };
+    const onVerification = (d: { decision: string; reason?: string | null }) =>
+      push({
+        jobId: '',
+        tone: d.decision === 'approve' ? 'good' : 'bad',
+        title: d.decision === 'approve' ? 'Your ID is verified' : 'ID check unsuccessful',
+        body: d.decision === 'approve' ? 'You can now offer on babysitting and care jobs.' : `${d.reason ?? ''} You can submit again from your profile.`,
+      });
     const onExpired = (d: { jobId: string; jobTitle?: string }) =>
       push({
         jobId: d.jobId,
@@ -120,6 +128,7 @@ export const NotificationCenter: React.FC<{
 
     socket.on('offer:new', onOfferNew);
     socket.on('job:nearby', onNearby);
+    socket.on('verification:reviewed', onVerification);
     socket.on('job:progress', onProgress);
     socket.on('job:expired', onExpired);
     socket.on('offer:accepted', onHired);
@@ -129,6 +138,7 @@ export const NotificationCenter: React.FC<{
     return () => {
       socket.off('offer:new', onOfferNew);
       socket.off('job:nearby', onNearby);
+      socket.off('verification:reviewed', onVerification);
       socket.off('job:progress', onProgress);
       socket.off('job:expired', onExpired);
       socket.off('offer:accepted', onHired);
@@ -160,12 +170,13 @@ export const NotificationCenter: React.FC<{
               className="flex-1 text-left"
               onClick={() => {
                 dismiss(t.id);
-                onOpenJob(t.jobId);
+                if (t.jobId) onOpenJob(t.jobId);
+                else goToProfile();
               }}
             >
               <p className="text-sm font-black text-white">{t.title}</p>
               <p className="text-xs text-slate-300 mt-0.5">{t.body}</p>
-              <p className="text-[11px] font-bold text-emerald-400 mt-1">Open job →</p>
+              <p className="text-[11px] font-bold text-emerald-400 mt-1">{t.jobId ? 'Open job →' : 'Open profile →'}</p>
             </button>
             <button onClick={() => dismiss(t.id)} className="p-1 h-fit rounded-lg text-slate-500 hover:text-white" aria-label="Dismiss">
               <X className="w-4 h-4" />

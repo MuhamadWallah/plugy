@@ -23,7 +23,8 @@ const personJson = (alias: string) => `json_build_object(
   'rating_avg', ${alias}.rating_avg,
   'rating_count', ${alias}.rating_count,
   'phone', ${alias}.phone,
-  'phone_verified', ${alias}.phone_verified
+  'phone_verified', ${alias}.phone_verified,
+  'id_verified', ${alias}.id_verified_at IS NOT NULL
 )`;
 
 /**
@@ -40,7 +41,13 @@ export const JOB_SELECT_COLUMNS = `
   CASE WHEN w.id IS NOT NULL THEN ${personJson('w')} ELSE NULL END AS worker,
   c.name AS category_name,
   c.icon AS category_icon,
-  (SELECT COUNT(*)::int FROM job_offers o WHERE o.job_id = j.id AND o.status = 'pending') AS offer_count
+  (SELECT COUNT(*)::int FROM job_offers o WHERE o.job_id = j.id AND o.status = 'pending') AS offer_count,
+  (
+    SELECT COALESCE(json_agg(json_build_object(
+      'id', p.id, 'url', '/uploads/' || p.file_name, 'width', p.width, 'height', p.height
+    ) ORDER BY p.created_at), '[]'::json)
+    FROM job_photos p WHERE p.job_id = j.id
+  ) AS photos
 `;
 
 export const JOB_FROM = `
@@ -144,6 +151,7 @@ export const OFFER_SELECT = `
       'rating_avg', w.rating_avg,
       'rating_count', w.rating_count,
       'phone_verified', w.phone_verified,
+      'id_verified', w.id_verified_at IS NOT NULL,
       'member_since', w.created_at,
       'jobs_completed', (
         SELECT COUNT(*)::int FROM jobs cj WHERE cj.worker_id = w.id AND cj.status = 'completed'

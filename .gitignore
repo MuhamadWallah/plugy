@@ -52,3 +52,6 @@ coverage/
 
 # Development Web Push keys (generated)
 .vapid-dev.json
+
+# Uploaded photos and ID documents (development)
+backend/uploads/

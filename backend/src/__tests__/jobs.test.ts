@@ -326,7 +326,7 @@ describe('Job Feed, Offers & Race-Condition Safe Hiring (Step 4)', () => {
         .set('Cookie', posterCookie)
         .send({
           title: 'High-Demand Errand Job',
-          category: 'care_taking',
+          category: 'car_wash',
           description: 'The poster double-taps two offers at the exact same moment.',
           location_text: 'Central Station Platform 2',
           budget: 120.0,

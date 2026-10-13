@@ -14,6 +14,7 @@ configRouter.get('/', (_req: Request, res: Response) => {
   res.status(200).json({
     emergencyNumber: env.EMERGENCY_NUMBER,
     pushPublicKey: getPushPublicKey(),
+    idRequiredCategories: env.ID_REQUIRED_CATEGORIES,
   });
 });
 

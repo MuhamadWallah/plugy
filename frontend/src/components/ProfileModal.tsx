@@ -3,6 +3,7 @@ import { X, Star, ShieldCheck, Briefcase, CalendarDays, RefreshCw } from 'lucide
 import { memberSince, relativeTime } from '../utils/format';
 import { Portal } from './Portal';
 import { categoryName } from '../utils/categories';
+import { Avatar, IdVerifiedBadge } from './Avatar';
 
 interface PublicProfile {
   id: string;
@@ -11,6 +12,7 @@ interface PublicProfile {
   rating_avg: string | number;
   rating_count: number;
   phone_verified: boolean;
+  id_verified?: boolean;
   member_since: string;
   jobs_completed: number;
   jobs_posted: number;
@@ -68,9 +70,7 @@ export const ProfileSummary: React.FC<{ userId: string; compact?: boolean }> = (
   return (
     <div className="space-y-5">
       <div className="flex items-center gap-4">
-        <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-400 to-teal-600 text-slate-950 font-black text-xl flex items-center justify-center">
-          {profile.name.charAt(0).toUpperCase()}
-        </div>
+        <Avatar name={profile.name} url={profile.avatar_url} size="lg" />
         <div>
           <h3 className="text-lg font-black text-white">{profile.name}</h3>
           <div className="flex items-center gap-2 text-xs text-slate-400 flex-wrap">
@@ -79,6 +79,7 @@ export const ProfileSummary: React.FC<{ userId: string; compact?: boolean }> = (
               <strong className="text-white">{Number(profile.rating_avg).toFixed(1)}</strong>
               ({profile.rating_count} {profile.rating_count === 1 ? 'review' : 'reviews'})
             </span>
+            {profile.id_verified && <IdVerifiedBadge />}
             {profile.phone_verified && (
               <span className="flex items-center gap-1 text-emerald-400">
                 <ShieldCheck className="w-3.5 h-3.5" /> Phone verified

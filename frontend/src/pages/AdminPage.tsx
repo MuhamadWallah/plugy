@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ShieldAlert, RefreshCw, Ban, CheckCircle2, AlertCircle, UserCheck, Star, Flag } from 'lucide-react';
 import { readApiError, relativeTime } from '../utils/format';
+import { VerificationQueue } from './VerificationQueue';
 
 interface AdminReport {
   id: string;
@@ -38,7 +39,7 @@ const REASON_LABELS: Record<string, string> = {
 /**
  * Moderation queue for accounts listed in ADMIN_EMAILS.
  */
-export const AdminPage: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ onOpenJob }) => {
+const ReportsQueue: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ onOpenJob }) => {
   const [status, setStatus] = useState<'open' | 'resolved'>('open');
   const [reports, setReports] = useState<AdminReport[]>([]);
   const [loading, setLoading] = useState(true);
@@ -84,6 +85,8 @@ export const AdminPage: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ on
           : data.message
       );
       setSuspending(null);
+      // Resolved reports leave the open queue right away (the reload below confirms it)
+      if (status === 'open') setReports((prev) => prev.filter((r) => r.id !== id));
       await load();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Action failed');
@@ -93,11 +96,8 @@ export const AdminPage: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ on
   };
 
   return (
-    <div className="max-w-4xl mx-auto w-full space-y-5">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <h1 className="text-xl font-black text-white flex items-center gap-2">
-          <ShieldAlert className="w-5 h-5 text-rose-400" /> Safety reports
-        </h1>
+    <div className="space-y-5">
+      <div className="flex items-center justify-end gap-3">
         <div className="flex items-center gap-2">
           <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800" role="group" aria-label="Report status">
             {(['open', 'resolved'] as const).map((s) => (
@@ -239,6 +239,39 @@ export const AdminPage: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ on
           );
         })}
       </ul>
+    </div>
+  );
+};
+
+/**
+ * Moderation for accounts listed in ADMIN_EMAILS: safety reports and ID checks.
+ */
+export const AdminPage: React.FC<{ onOpenJob: (jobId: string) => void }> = ({ onOpenJob }) => {
+  const [tab, setTab] = useState<'reports' | 'ids'>('reports');
+  return (
+    <div className="max-w-4xl mx-auto w-full space-y-5">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+        <h1 className="text-xl font-black text-white flex items-center gap-2">
+          <ShieldAlert className="w-5 h-5 text-rose-400" /> Moderation
+        </h1>
+        <div className="flex bg-slate-950 p-1 rounded-xl border border-slate-800" role="tablist" aria-label="Moderation queues">
+          {([
+            ['reports', 'Safety reports'],
+            ['ids', 'ID checks'],
+          ] as const).map(([key, label]) => (
+            <button
+              key={key}
+              role="tab"
+              aria-selected={tab === key}
+              onClick={() => setTab(key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold ${tab === key ? 'bg-slate-800 text-white' : 'text-slate-400'}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {tab === 'reports' ? <ReportsQueue onOpenJob={onOpenJob} /> : <VerificationQueue />}
     </div>
   );
 };

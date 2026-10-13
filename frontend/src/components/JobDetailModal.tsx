@@ -43,6 +43,9 @@ import { ReportDialog } from './ReportDialog';
 import { SafetySheet } from './SafetySheet';
 import { sound } from '../utils/sound';
 import { Portal } from './Portal';
+import { Avatar, IdVerifiedBadge } from './Avatar';
+import { JobPhotoGallery } from './JobPhotoGallery';
+import { goToProfile, useIdRequirement } from '../hooks/useIdRequirement';
 
 export type { JobRating };
 export type JobDetail = Job;
@@ -154,17 +157,12 @@ const PersonCard: React.FC<{
     className="w-full p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 hover:border-slate-700 flex items-center justify-between text-left"
   >
     <div className="flex items-center gap-3 min-w-0">
-      <div
-        className={`w-9 h-9 shrink-0 rounded-xl text-slate-950 font-black flex items-center justify-center text-xs ${
-          role === 'Customer' ? 'bg-gradient-to-br from-emerald-400 to-teal-600' : 'bg-gradient-to-br from-sky-400 to-indigo-600'
-        }`}
-      >
-        {person.name.charAt(0).toUpperCase()}
-      </div>
+      <Avatar name={person.name} url={person.avatar_url} size="md" tone={role === 'Customer' ? 'emerald' : 'sky'} />
       <div className="min-w-0">
         <div className="text-xs font-bold text-white flex items-center gap-1.5 truncate">
           <span className="truncate">{person.name}</span>
           {isYou && <span className="text-[10px] text-emerald-400 font-bold">(You)</span>}
+          {person.id_verified && <IdVerifiedBadge compact />}
           {person.phone_verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400 shrink-0" aria-label="Phone verified" />}
         </div>
         <div className="text-[10px] text-slate-400 flex items-center gap-1">
@@ -182,6 +180,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose, 
   const { user } = useAuth();
   const { socket } = useSocket();
 
+  const needsId = useIdRequirement();
   const [job, setJob] = useState<Job | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -527,10 +526,20 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose, 
                     ) : (
                       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                         <p className="text-sm text-slate-300">
-                          {job.budget !== null
+                          {needsId(job.category_slug)
+                            ? `${job.category_name} jobs need a verified ID. It only takes a photo of your ID and a selfie.`
+                            : job.budget !== null
                             ? `Accept ${formatMoney(job.budget)} or offer your own price.`
                             : 'The customer wants to hear your price.'}
                         </p>
+                        {needsId(job.category_slug) ? (
+                          <button
+                            onClick={goToProfile}
+                            className="px-5 py-3 rounded-2xl bg-sky-500 hover:bg-sky-400 text-slate-950 text-sm font-black"
+                          >
+                            Verify my ID
+                          </button>
+                        ) : (
                         <button
                           onClick={() => {
                             if (!user) {
@@ -544,6 +553,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose, 
                           <Send className="w-4 h-4" />
                           {user ? 'Make an offer' : 'Sign in to make an offer'}
                         </button>
+                        )}
                       </div>
                     )}
                   </div>
@@ -698,6 +708,13 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose, 
                     {job.description || 'No additional details provided.'}
                   </p>
                 </div>
+                <JobPhotoGallery
+                  jobId={job.id}
+                  photos={job.photos ?? []}
+                  canEdit={isPoster && ['open', 'accepted'].includes(job.status)}
+                  onChanged={() => fetchJob(true)}
+                />
+
                 <div className="grid grid-cols-2 gap-3 text-xs">
                   <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center gap-3">
                     <CalendarClock className="w-5 h-5 text-sky-400 shrink-0" />

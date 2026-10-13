@@ -5,6 +5,7 @@ import { ViewerLocation } from '../hooks/useViewerLocation';
 import { CATEGORIES, categoryName } from '../utils/categories';
 import { enablePushNotifications, pushSupported } from '../utils/push';
 import { sound } from '../utils/sound';
+import { useIdRequirement } from '../hooks/useIdRequirement';
 
 interface WorkModeCardProps {
   location: ViewerLocation | null;
@@ -21,6 +22,7 @@ const HOURS = [4, 8, 12];
  */
 export const WorkModeCard: React.FC<WorkModeCardProps> = ({ location, onLocate, locating }) => {
   const { availability, goOnline, goOffline } = useAvailability();
+  const needsId = useIdRequirement();
   const [editing, setEditing] = useState(false);
   const [categories, setCategories] = useState<string[]>([]);
   const [radius, setRadius] = useState(10);
@@ -211,6 +213,12 @@ export const WorkModeCard: React.FC<WorkModeCardProps> = ({ location, onLocate, 
           </div>
         </fieldset>
       </div>
+
+      {categories.some(needsId) && (
+        <p className="text-xs text-sky-200">
+          Alerts for {categories.filter(needsId).map(categoryName).join(' and ')} start once your ID is verified (My profile → ID verification).
+        </p>
+      )}
 
       <p className="text-xs text-slate-400 flex items-center gap-2 flex-wrap">
         {location ? (

@@ -3,3 +3,4 @@ dist
 .env
 npm-debug.log
 .vapid-dev.json
+uploads

@@ -9,6 +9,7 @@ export interface PersonSummary {
   rating_avg: string | number;
   rating_count: number;
   phone_verified?: boolean;
+  id_verified?: boolean;
   /** Only present for the other party once a worker is hired */
   phone?: string | null;
 }
@@ -72,6 +73,14 @@ export interface Job {
   /** Signed-in worker's own offer on this job */
   my_offer?: MyOfferSummary | null;
   ratings?: JobRating[];
+  photos?: JobPhoto[];
+}
+
+export interface JobPhoto {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
 }
 
 export interface OfferWorker {
@@ -81,6 +90,7 @@ export interface OfferWorker {
   rating_avg: string | number;
   rating_count: number;
   phone_verified: boolean;
+  id_verified?: boolean;
   member_since: string;
   jobs_completed: number;
 }

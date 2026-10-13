@@ -39,6 +39,9 @@ import { requestNotificationPermission } from '../utils/notify';
 import { MapView, MapMarker } from './MapView';
 import { OfferModal } from './OfferModal';
 import { WorkModeCard } from './WorkModeCard';
+import { Avatar } from './Avatar';
+import { goToProfile, useIdRequirement } from '../hooks/useIdRequirement';
+import { BadgeCheck } from 'lucide-react';
 import { sound } from '../utils/sound';
 
 export type FeedJob = Job;
@@ -69,6 +72,7 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
   const { user } = useAuth();
   const { socket } = useSocket();
   const { location, setLocation, locate, locating, error: locationError, clearError } = useViewerLocation();
+  const needsId = useIdRequirement();
 
   const [jobs, setJobs] = useState<Job[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
@@ -155,7 +159,9 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
     const onTaken = ({ jobId }: { jobId: string }) => setJobs((prev) => prev.filter((j) => j.id !== jobId));
     const onUpdated = ({ jobId, job }: { jobId: string; job: Job }) => {
       setJobs((prev) =>
-        prev.map((j) => (j.id === jobId ? { ...j, budget: job.budget, title: job.title, description: job.description, updated_at: job.updated_at } : j))
+        prev.map((j) =>
+          j.id === jobId ? { ...j, budget: job.budget, title: job.title, description: job.description, photos: job.photos, updated_at: job.updated_at } : j
+        )
       );
     };
     const onMyOfferUpdated = ({ jobId, status }: { jobId: string; status: MyOfferSummary['status'] }) => {
@@ -685,6 +691,21 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
       return <span className="px-3 py-2 rounded-xl bg-slate-950 border border-slate-800 text-xs font-bold text-slate-500">Offer declined</span>;
     }
 
+    if (needsId(job.category_slug)) {
+      return (
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            goToProfile();
+          }}
+          className="px-3 py-2 rounded-xl bg-sky-500/15 border border-sky-500/40 text-sky-200 text-xs font-bold flex items-center gap-1.5"
+          title="Babysitting and care jobs need a verified ID"
+        >
+          <BadgeCheck className="w-3.5 h-3.5" /> Verify ID to offer
+        </button>
+      );
+    }
+
     return (
       <div className="flex items-center gap-1.5">
         {job.budget !== null && (
@@ -726,6 +747,17 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
           isActive ? 'border-amber-400 ring-2 ring-amber-400/20' : 'border-slate-800/90 hover:border-emerald-500/50'
         }`}
       >
+        {job.photos && job.photos.length > 0 && (
+          <div className="relative -mx-5 -mt-5 mb-1 h-36 overflow-hidden rounded-t-3xl bg-slate-950">
+            <img src={job.photos[0].url} alt="" loading="lazy" className="w-full h-full object-cover" />
+            {job.photos.length > 1 && (
+              <span className="absolute bottom-2 right-2 px-2 py-0.5 rounded-lg bg-slate-950/80 text-[10px] font-bold text-white">
+                +{job.photos.length - 1} photo{job.photos.length > 2 ? 's' : ''}
+              </span>
+            )}
+          </div>
+        )}
+
         <div className="flex items-start justify-between gap-2">
           <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
             {job.category_name}
@@ -763,9 +795,7 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
 
         <div className="flex items-center justify-between gap-2 pt-2 border-t border-slate-800/80">
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 shrink-0 rounded-xl bg-emerald-500/20 text-emerald-300 font-black flex items-center justify-center text-xs">
-              {job.poster.name.charAt(0).toUpperCase()}
-            </div>
+            <Avatar name={job.poster.name} url={job.poster.avatar_url} size="sm" />
             <div className="min-w-0">
               <span className="text-xs font-bold text-slate-200 block truncate">{job.poster.name}</span>
               <div className="text-[10px] text-slate-400 flex items-center gap-1">

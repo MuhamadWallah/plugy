@@ -1,5 +1,6 @@
 import { query } from '../config/db.js';
 import { notify } from './notify.service.js';
+import { env } from '../config/env.js';
 
 /** Maximum workers alerted per job (closest first) */
 const MAX_ALERTS_PER_JOB = 50;
@@ -32,11 +33,12 @@ export const alertNearbyWorkers = async (jobId: string): Promise<string[]> => {
        AND j.status = 'open'
        AND j.latitude IS NOT NULL AND j.longitude IS NOT NULL
        AND w.user_id <> j.poster_id
+       AND (NOT (j.category_slug = ANY($2::text[])) OR u.id_verified_at IS NOT NULL)
        AND NOT EXISTS (SELECT 1 FROM job_offers o WHERE o.job_id = j.id AND o.worker_id = w.user_id)
        AND ${distance} <= w.radius_km
      ORDER BY distance_km ASC
      LIMIT ${MAX_ALERTS_PER_JOB}`,
-    [jobId]
+    [jobId, env.ID_REQUIRED_CATEGORIES]
   );
 
   for (const row of rows) {

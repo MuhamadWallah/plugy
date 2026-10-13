@@ -31,6 +31,20 @@ export const offerRateLimiter = rateLimit({
 });
 
 /**
+ * Rate limiter for photo uploads (profile, job photos, ID documents).
+ */
+export const uploadRateLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: env.RATE_LIMIT_ENABLED ? env.RATE_LIMIT_UPLOADS_MAX : 1000,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: {
+    error: 'Too many uploads. Please wait a few minutes and try again.',
+  },
+  skip: () => !env.RATE_LIMIT_ENABLED,
+});
+
+/**
  * Rate limiter for job creation to prevent spam and board flooding.
  */
 export const jobPostRateLimiter = rateLimit({

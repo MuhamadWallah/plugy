@@ -59,6 +59,7 @@ export const env = {
   RATE_LIMIT_AUTH_MAX: parseInt(process.env.RATE_LIMIT_AUTH_MAX || '15', 10),
   RATE_LIMIT_JOBS_MAX: parseInt(process.env.RATE_LIMIT_JOBS_MAX || '30', 10),
   RATE_LIMIT_OFFERS_MAX: parseInt(process.env.RATE_LIMIT_OFFERS_MAX || '60', 10),
+  RATE_LIMIT_UPLOADS_MAX: parseInt(process.env.RATE_LIMIT_UPLOADS_MAX || '40', 10),
 
   // Number shown on the in-app safety screen (112 reaches emergency services from most mobile networks)
   EMERGENCY_NUMBER: (process.env.EMERGENCY_NUMBER || '112').trim(),
@@ -77,6 +78,15 @@ export const env = {
   // Open "as soon as possible" requests expire after this many hours without a hire;
   // scheduled requests expire 2 hours after their requested time.
   JOB_OPEN_HOURS: parseInt(process.env.JOB_OPEN_HOURS || '72', 10),
+
+  // Where uploaded images are stored (public/ for profile and job photos, private/ for ID documents)
+  UPLOAD_DIR: process.env.UPLOAD_DIR || 'uploads',
+
+  // Categories where only ID-verified workers can make offers and get alerts (comma-separated slugs)
+  ID_REQUIRED_CATEGORIES: (process.env.ID_REQUIRED_CATEGORIES ?? 'babysitting,care_taking')
+    .split(',')
+    .map((c) => c.trim().toLowerCase())
+    .filter(Boolean),
 };
 
 export const isAdminEmail = (email: string | null | undefined): boolean =>

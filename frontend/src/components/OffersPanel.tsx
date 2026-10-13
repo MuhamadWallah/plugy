@@ -5,6 +5,7 @@ import { Job, Offer } from '../types/marketplace';
 import { formatEta, formatMoney, readApiError, relativeTime } from '../utils/format';
 import { ProfileModal } from './ProfileModal';
 import { sound } from '../utils/sound';
+import { Avatar, IdVerifiedBadge } from './Avatar';
 
 interface OffersPanelProps {
   job: Pick<Job, 'id' | 'budget' | 'status'>;
@@ -166,12 +167,11 @@ export const OffersPanel: React.FC<OffersPanelProps> = ({ job, onHired, onBudget
             <li key={offer.id} className="p-3.5 rounded-2xl bg-slate-950/80 border border-slate-800 space-y-3">
               <div className="flex items-start justify-between gap-3">
                 <button onClick={() => setProfileId(offer.worker.id)} className="flex items-center gap-3 text-left min-w-0">
-                  <div className="w-10 h-10 shrink-0 rounded-xl bg-gradient-to-br from-sky-400 to-indigo-600 text-slate-950 font-black flex items-center justify-center">
-                    {offer.worker.name.charAt(0).toUpperCase()}
-                  </div>
+                  <Avatar name={offer.worker.name} url={offer.worker.avatar_url} tone="sky" />
                   <div className="min-w-0">
                     <div className="text-sm font-bold text-white truncate flex items-center gap-1.5">
                       {offer.worker.name}
+                      {offer.worker.id_verified && <IdVerifiedBadge compact />}
                       {offer.worker.phone_verified && <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" aria-label="Phone verified" />}
                     </div>
                     <div className="text-[11px] text-slate-400 flex items-center gap-2 flex-wrap">

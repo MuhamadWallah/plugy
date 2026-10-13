@@ -9,6 +9,7 @@ import { adminRouter, offerRouter, userRouter, workerRouter } from './routes/use
 import { configRouter, pushRouter } from './routes/system.routes.js';
 import { requireAuth } from './middleware/auth.middleware.js';
 import { initPush } from './services/push.service.js';
+import { ensureUploadDirs, publicUploadDir } from './services/upload.service.js';
 import { requestLogger } from './middleware/logger.middleware.js';
 import { errorHandler, notFoundHandler } from './middleware/error.middleware.js';
 
@@ -16,6 +17,7 @@ export const createApp = (): Express => {
   const app = express();
 
   initPush();
+  ensureUploadDirs();
 
   app.disable('x-powered-by');
 
@@ -52,6 +54,17 @@ export const createApp = (): Express => {
   app.use('/api/offers', offerRouter);
   app.use('/api/users', userRouter);
   app.use('/api/workers', workerRouter);
+
+  // Public photos (profile and job photos): random names, so they can be cached forever
+  app.use(
+    '/uploads',
+    express.static(publicUploadDir(), {
+      index: false,
+      immutable: true,
+      maxAge: '365d',
+      setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+    })
+  );
   app.use('/api/admin', adminRouter);
   app.use('/api/config', configRouter);
   app.use('/api/push', pushRouter);

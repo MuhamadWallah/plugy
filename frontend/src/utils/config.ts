@@ -1,9 +1,11 @@
 export interface AppConfig {
   emergencyNumber: string;
   pushPublicKey: string | null;
+  /** Categories where workers need a verified ID to make offers */
+  idRequiredCategories: string[];
 }
 
-const FALLBACK: AppConfig = { emergencyNumber: '112', pushPublicKey: null };
+const FALLBACK: AppConfig = { emergencyNumber: '112', pushPublicKey: null, idRequiredCategories: ['babysitting', 'care_taking'] };
 let cached: Promise<AppConfig> | null = null;
 
 /** Public server settings (fetched once per page load) */

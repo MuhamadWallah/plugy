@@ -17,6 +17,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { sound } from '../utils/sound';
+import { Avatar } from './Avatar';
 
 export type NavView = 'feed' | 'my-jobs' | 'post-job' | 'dashboard' | 'admin' | 'login' | 'register';
 
@@ -173,9 +174,7 @@ export const Navbar: React.FC<NavbarProps> = ({ currentView, setCurrentView }) =
                 aria-label="Your profile"
                 className="flex items-center gap-2.5 px-1.5 sm:px-3 py-1.5 rounded-xl bg-slate-900/90 border border-slate-800 hover:border-slate-700 transition cursor-pointer text-left"
               >
-                <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-400 flex items-center justify-center text-xs font-black">
-                  {user.name.charAt(0).toUpperCase()}
-                </div>
+                <Avatar name={user.name} url={user.avatar_url} size="sm" />
                 <div className="text-left hidden sm:block">
                   <div className="text-xs font-bold text-white leading-tight">{user.name}</div>
                   <div className="text-[10px] text-slate-400 flex items-center gap-1">

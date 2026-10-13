@@ -45,6 +45,10 @@ RUN npm ci --omit=dev && npm cache clean --force
 COPY --from=build /app/dist ./dist
 COPY migrations ./migrations
 
+# Persistent storage for photos and ID documents (mount a volume here)
+ENV UPLOAD_DIR=/data/uploads
+RUN mkdir -p /data/uploads && chown -R node:node /data
+
 USER node
 
 EXPOSE 5000

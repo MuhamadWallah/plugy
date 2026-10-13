@@ -214,7 +214,7 @@ export const login = async (req: Request, res: Response) => {
     // Look up user by email
     const result = await query(
       `SELECT id, name, email, password_hash, phone, phone_verified, avatar_url, rating_avg, rating_count, created_at, updated_at,
-              suspended_at
+              (id_verified_at IS NOT NULL) AS id_verified, suspended_at
        FROM users
        WHERE LOWER(email) = LOWER($1)`,
       [email]
