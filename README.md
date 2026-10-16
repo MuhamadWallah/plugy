@@ -8,7 +8,7 @@
 4. The worker navigates there, taps **On my way** (the customer follows them live on the map), **Arrived**, **Start** and **Done**. The two can call and chat once matched.
 5. Both rate each other. Cancellations and back-outs carry a reason, a back-out reopens the job, and anyone can report a user.
 
-It also covers what a real service needs: requested time and payment method, automatic expiry of unanswered requests, an installable app with push notifications, a worker "go online" mode that pushes nearby matching jobs, profile and job photos, worker ID verification (required for childcare and care work), a safety screen (emergency call, share job details), password reset by SMS, and an admin queue for reports and suspensions.
+It also covers what a real service needs: requested time and payment method, automatic expiry of unanswered requests, an installable app with push notifications, a worker "go online" mode that pushes nearby matching jobs, profile and job photos, worker ID verification (required for childcare and care work), worker reliability and earnings, account settings with self-service deletion, a configurable currency, automatic backups, a safety screen (emergency call, share job details), password reset by SMS, and an admin queue for reports and suspensions.
 
 ---
 
@@ -132,6 +132,9 @@ Test suites cover:
 - Scheduling, Expiry, Web Push, Password Reset & Moderation (`operations.test.ts`)
 - Worker Online Mode & Nearby Job Alerts (`dispatch.test.ts`)
 - Photos, Metadata Stripping & ID Verification (`media.test.ts`)
+- Account Settings, Earnings, Reliability & Deletion (`accounts.test.ts`)
+
+The same checks run on GitHub Actions for every push and pull request (`.github/workflows/ci.yml`).
 - Lifecycle Status Transitions & Personal List (`transitions.test.ts`)
 - Direct Scoped Chat & Realtime WebSocket Delivery (`messages.test.ts`)
 - Post-Completion Ratings & Averages (`ratings.test.ts`)

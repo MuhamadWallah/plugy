@@ -6,7 +6,7 @@ import {
   Car,
   HeartHandshake,
   Baby,
-  DollarSign,
+  Banknote,
   MapPin,
   Type,
   FileText,
@@ -30,7 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { Job, PaymentMethod } from '../types/marketplace';
-import { PAYMENT_METHODS, formatMoney, formatSchedule, paymentLabel } from '../utils/format';
+import { PAYMENT_METHODS, formatMoney, formatMoneyShort, formatSchedule, paymentLabel } from '../utils/format';
 import { LatLng, PlaceResult, getCurrentPosition, reverseGeocode, searchPlaces } from '../utils/geo';
 import { requestNotificationPermission } from '../utils/notify';
 import { MapView } from './MapView';
@@ -546,7 +546,7 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
             ) : (
               <>
                 <div className="relative">
-                  <DollarSign className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Banknote className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     type="number"
                     inputMode="decimal"
@@ -555,7 +555,7 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
                     value={budget}
                     onChange={(e) => setBudget(e.target.value)}
                     placeholder="What you're willing to pay"
-                    aria-label="Price in US dollars"
+                    aria-label="Your price"
                     className="w-full pl-10 pr-4 py-2.5 rounded-2xl bg-slate-900 border border-slate-800 focus:border-emerald-500 text-sm text-white placeholder-slate-500 outline-none"
                   />
                 </div>
@@ -569,7 +569,7 @@ export const CreateJobForm: React.FC<CreateJobFormProps> = ({ onJobCreated, onRe
                         budget === amt ? 'bg-emerald-500 text-slate-950 border-emerald-400' : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                       }`}
                     >
-                      ${amt}
+                      {formatMoneyShort(amt)}
                     </button>
                   ))}
                 </div>

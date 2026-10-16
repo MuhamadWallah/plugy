@@ -79,6 +79,9 @@ export const env = {
   // scheduled requests expire 2 hours after their requested time.
   JOB_OPEN_HOURS: parseInt(process.env.JOB_OPEN_HOURS || '72', 10),
 
+  // Marketplace currency (ISO 4217 code), used for every price shown and notified
+  CURRENCY: (process.env.CURRENCY || 'USD').trim().toUpperCase(),
+
   // Where uploaded images are stored (public/ for profile and job photos, private/ for ID documents)
   UPLOAD_DIR: process.env.UPLOAD_DIR || 'uploads',
 

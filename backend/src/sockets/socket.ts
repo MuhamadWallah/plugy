@@ -49,8 +49,8 @@ export const initSocketServer = (httpServer: HttpServer): SocketIOServer => {
     if (token) {
       try {
         const payload = verifyToken(token);
-        const { rows } = await query('SELECT password_changed_at, suspended_at FROM users WHERE id = $1', [payload.userId]);
-        if (rows.length > 0 && !rows[0].suspended_at && !isSessionRevoked(payload, rows[0].password_changed_at)) {
+        const { rows } = await query('SELECT password_changed_at, suspended_at, deleted_at FROM users WHERE id = $1', [payload.userId]);
+        if (rows.length > 0 && !rows[0].suspended_at && !rows[0].deleted_at && !isSessionRevoked(payload, rows[0].password_changed_at)) {
           socket.data.userId = payload.userId;
         }
       } catch {

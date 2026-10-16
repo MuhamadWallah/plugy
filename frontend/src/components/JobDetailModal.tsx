@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   X,
   MapPin,
-  DollarSign,
+  Banknote,
   Clock,
   Star,
   Sparkles,
@@ -731,7 +731,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ jobId, onClose, 
                     </div>
                   </div>
                   <div className="p-3.5 rounded-2xl bg-slate-950/70 border border-slate-800 flex items-center gap-3">
-                    <DollarSign className="w-5 h-5 text-emerald-400 shrink-0" />
+                    <Banknote className="w-5 h-5 text-emerald-400 shrink-0" />
                     <div>
                       <span className="text-[10px] text-slate-500 uppercase tracking-wider block font-bold">Price</span>
                       <span className="font-black text-white text-sm">{formatMoney(price) ?? 'Open to offers'}</span>

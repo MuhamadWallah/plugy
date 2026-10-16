@@ -33,7 +33,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSocket } from '../context/SocketContext';
 import { useViewerLocation } from '../hooks/useViewerLocation';
 import { Job, MyOfferSummary } from '../types/marketplace';
-import { formatDistance, formatMoney, formatSchedule, paymentLabel, readApiError, relativeTime } from '../utils/format';
+import { formatDistance, formatMoney, formatMoneyShort, formatSchedule, paymentLabel, readApiError, relativeTime } from '../utils/format';
 import { PlaceResult, haversineKm, searchPlaces } from '../utils/geo';
 import { requestNotificationPermission } from '../utils/notify';
 import { MapView, MapMarker } from './MapView';
@@ -311,7 +311,7 @@ export const JobFeed: React.FC<JobFeedProps> = ({ onSelectJob, onRequireAuth, on
         lat: j.latitude!,
         lng: j.longitude!,
         kind: j.id === activeJobId ? 'job-active' : 'job',
-        label: j.budget !== null ? `$${Math.round(Number(j.budget))}` : 'Offer',
+        label: j.budget !== null ? formatMoneyShort(j.budget) : 'Offer',
         title: j.title,
       }));
     if (location) markers.push({ id: '__me', lat: location.lat, lng: location.lng, kind: 'me', title: 'You' });

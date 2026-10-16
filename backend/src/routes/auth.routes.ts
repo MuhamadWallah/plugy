@@ -9,6 +9,7 @@ import {
   requestPasswordReset,
   confirmPasswordReset,
 } from '../controllers/auth.controller.js';
+import { changePassword } from '../controllers/account.controller.js';
 import { requireAuth } from '../middleware/auth.middleware.js';
 import { authRateLimiter } from '../middleware/rateLimit.middleware.js';
 
@@ -20,6 +21,7 @@ router.post('/register', authRateLimiter, register);
 router.post('/login', authRateLimiter, login);
 router.post('/password-reset/request', authRateLimiter, requestPasswordReset);
 router.post('/password-reset/confirm', authRateLimiter, confirmPasswordReset);
+router.post('/change-password', requireAuth, authRateLimiter, changePassword);
 router.post('/logout', logout);
 router.get('/me', requireAuth, getMe);
 

@@ -40,6 +40,7 @@ services:
       CORS_ORIGIN: http://localhost:${FRONTEND_PORT:-5174}
       ADMIN_EMAILS: ${ADMIN_EMAILS:-}
       EMERGENCY_NUMBER: ${EMERGENCY_NUMBER:-112}
+      CURRENCY: ${CURRENCY:-USD}
       CHOKIDAR_USEPOLLING: "true"
     ports:
       - "${BACKEND_PORT:-5001}:5000"

@@ -1,6 +1,7 @@
 import { query } from '../config/db.js';
 import { notify } from './notify.service.js';
 import { env } from '../config/env.js';
+import { formatMoney } from '../utils/money.js';
 
 /** Maximum workers alerted per job (closest first) */
 const MAX_ALERTS_PER_JOB = 50;
@@ -44,7 +45,7 @@ export const alertNearbyWorkers = async (jobId: string): Promise<string[]> => {
   for (const row of rows) {
     const km = Math.round(Number(row.distance_km) * 10) / 10;
     const away = km < 1 ? 'under 1 km away' : `${km} km away`;
-    const price = row.budget !== null ? `$${Number(row.budget).toFixed(2)}` : 'Open to offers';
+    const price = row.budget !== null ? formatMoney(row.budget) : 'Open to offers';
     notify(
       row.user_id,
       'job:nearby',

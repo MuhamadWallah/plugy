@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   Sparkles, 
   MapPin, 
-  DollarSign, 
+  Banknote, 
   Clock, 
   Play, 
   CheckCircle2, 
@@ -648,7 +648,7 @@ export const MyJobs: React.FC<MyJobsProps> = ({
                     </span>
 
                     <span className="flex items-center gap-1 font-bold text-white bg-slate-950 px-2.5 py-0.5 rounded-lg border border-slate-800">
-                      <DollarSign className="w-3.5 h-3.5 text-emerald-400" />
+                      <Banknote className="w-3.5 h-3.5 text-emerald-400" />
                       {formatMoney(priceOf(job)) ?? 'Open to offers'}
                     </span>
 

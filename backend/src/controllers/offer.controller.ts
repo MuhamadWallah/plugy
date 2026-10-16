@@ -6,7 +6,7 @@ import { broadcastJobAccepted, notifyUser } from '../sockets/socket.js';
 import { notify } from '../services/notify.service.js';
 import { env } from '../config/env.js';
 
-const money = (value: unknown) => `$${Number(value).toFixed(2)}`;
+import { formatMoney as money } from '../utils/money.js';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 

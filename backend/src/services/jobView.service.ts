@@ -155,7 +155,8 @@ export const OFFER_SELECT = `
       'member_since', w.created_at,
       'jobs_completed', (
         SELECT COUNT(*)::int FROM jobs cj WHERE cj.worker_id = w.id AND cj.status = 'completed'
-      )
+      ),
+      'backouts', (SELECT COUNT(*)::int FROM job_releases r WHERE r.worker_id = w.id)
     ) AS worker
   FROM job_offers o
   JOIN users w ON w.id = o.worker_id

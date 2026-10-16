@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Star, ShieldCheck, Clock, TrendingUp, Check, X, RefreshCw, Users, AlertCircle, Briefcase } from 'lucide-react';
 import { useSocket } from '../context/SocketContext';
 import { Job, Offer } from '../types/marketplace';
-import { formatEta, formatMoney, readApiError, relativeTime } from '../utils/format';
+import { formatEta, formatMoney, readApiError, relativeTime, reliability } from '../utils/format';
 import { ProfileModal } from './ProfileModal';
 import { sound } from '../utils/sound';
 import { Avatar, IdVerifiedBadge } from './Avatar';
@@ -183,6 +183,12 @@ export const OffersPanel: React.FC<OffersPanelProps> = ({ job, onHired, onBudget
                       <span className="flex items-center gap-0.5">
                         <Briefcase className="w-3 h-3" /> {offer.worker.jobs_completed} jobs
                       </span>
+                      {(() => {
+                        const pct = reliability(offer.worker.jobs_completed, offer.worker.backouts ?? 0);
+                        return pct === null ? null : (
+                          <span className={pct >= 90 ? 'text-emerald-300' : pct >= 75 ? 'text-amber-300' : 'text-rose-300'}>{pct}% completed</span>
+                        );
+                      })()}
                       <span className="underline decoration-dotted">View profile</span>
                     </div>
                   </div>

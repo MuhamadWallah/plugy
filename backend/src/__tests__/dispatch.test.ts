@@ -5,6 +5,7 @@ import webpush from 'web-push';
 import { createApp } from '../app.js';
 import { query } from '../config/db.js';
 import { alertNearbyWorkers } from '../services/dispatch.service.js';
+import { formatMoney } from '../utils/money.js';
 
 const app = createApp();
 
@@ -140,7 +141,7 @@ describe('Worker online mode and nearby job alerts', () => {
       await new Promise((r) => setTimeout(r, 200)); // push is sent in the background
 
       const mine = pushed.find((p) => p.endpoint.endsWith(`/dispatch/${stamp}`));
-      expect(mine?.payload.title).toBe('New ironing job · $25.00');
+      expect(mine?.payload.title).toBe(`New ironing job · ${formatMoney(25)}`);
       expect(mine?.payload.body).toMatch(/km away|under 1 km away/);
       expect(mine?.payload.url).toBe(`/?job=${jobId}`);
     });

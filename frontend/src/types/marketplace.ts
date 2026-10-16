@@ -93,6 +93,7 @@ export interface OfferWorker {
   id_verified?: boolean;
   member_since: string;
   jobs_completed: number;
+  backouts?: number;
 }
 
 export interface Offer {

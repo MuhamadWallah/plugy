@@ -4,6 +4,7 @@ import { getMyOffers } from '../controllers/offer.controller.js';
 import { listReports, resolveReport, unsuspendUser } from '../controllers/admin.controller.js';
 import { getMyAvailability, updateMyAvailability } from '../controllers/worker.controller.js';
 import { deleteAvatar, uploadAvatar } from '../controllers/media.controller.js';
+import { deleteMyAccount, getMyEarnings, updateMyProfile } from '../controllers/account.controller.js';
 import {
   getMyVerification,
   getVerificationFile,
@@ -17,6 +18,8 @@ import { requireAdmin, requireAuth } from '../middleware/auth.middleware.js';
 
 export const userRouter = Router();
 
+userRouter.patch('/me', requireAuth, updateMyProfile);
+userRouter.delete('/me', requireAuth, deleteMyAccount);
 userRouter.post('/me/avatar', requireAuth, uploadRateLimiter, acceptImages(['photo']), uploadAvatar);
 userRouter.delete('/me/avatar', requireAuth, deleteAvatar);
 userRouter.get('/me/verification', requireAuth, getMyVerification);
@@ -32,6 +35,7 @@ export const workerRouter = Router();
 
 workerRouter.get('/me/availability', requireAuth, getMyAvailability);
 workerRouter.put('/me/availability', requireAuth, updateMyAvailability);
+workerRouter.get('/me/earnings', requireAuth, getMyEarnings);
 
 export const adminRouter = Router();
 

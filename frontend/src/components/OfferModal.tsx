@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { X, DollarSign, Clock, MessageSquare, Send, Undo2, AlertCircle, Star, MapPin, CalendarClock, Wallet } from 'lucide-react';
+import { X, Banknote, Clock, MessageSquare, Send, Undo2, AlertCircle, Star, MapPin, CalendarClock, Wallet } from 'lucide-react';
 import { Job, MyOfferSummary } from '../types/marketplace';
 import { ETA_OPTIONS, formatDistance, formatMoney, formatSchedule, paymentLabel, readApiError } from '../utils/format';
 import { requestNotificationPermission } from '../utils/notify';
@@ -166,7 +166,7 @@ export const OfferModal: React.FC<OfferModalProps> = ({ job, existingOffer, onCl
                   {budget !== null ? 'Or offer your price' : 'Your price'}
                 </label>
                 <div className="relative">
-                  <DollarSign className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                  <Banknote className="w-4 h-4 text-emerald-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
                   <input
                     id="offer-price"
                     type="number"

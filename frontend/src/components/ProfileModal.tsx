@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { X, Star, ShieldCheck, Briefcase, CalendarDays, RefreshCw } from 'lucide-react';
-import { memberSince, relativeTime } from '../utils/format';
+import { memberSince, relativeTime, reliability } from '../utils/format';
 import { Portal } from './Portal';
 import { categoryName } from '../utils/categories';
 import { Avatar, IdVerifiedBadge } from './Avatar';
@@ -17,6 +17,8 @@ interface PublicProfile {
   jobs_completed: number;
   jobs_posted: number;
   work_categories?: string[];
+  backouts?: number;
+  deleted?: boolean;
 }
 
 interface Review {
@@ -66,6 +68,10 @@ export const ProfileSummary: React.FC<{ userId: string; compact?: boolean }> = (
   if (error || !profile) {
     return <p className="py-8 text-center text-sm text-rose-300">{error || 'Profile not found'}</p>;
   }
+  if (profile.deleted) {
+    return <p className="py-8 text-center text-sm text-slate-400">This person deleted their account.</p>;
+  }
+  const completedPct = reliability(profile.jobs_completed, profile.backouts ?? 0);
 
   return (
     <div className="space-y-5">
@@ -88,6 +94,15 @@ export const ProfileSummary: React.FC<{ userId: string; compact?: boolean }> = (
           </div>
         </div>
       </div>
+
+      {completedPct !== null && (
+        <p className="text-xs text-slate-300">
+          <strong className={completedPct >= 90 ? 'text-emerald-300' : completedPct >= 75 ? 'text-amber-300' : 'text-rose-300'}>
+            {completedPct}% of hires completed
+          </strong>
+          {profile.backouts ? ` · backed out of ${profile.backouts} job${profile.backouts === 1 ? '' : 's'}` : ''}
+        </p>
+      )}
 
       {profile.work_categories && profile.work_categories.length > 0 && (
         <div className="flex flex-wrap gap-1.5" aria-label="Works in">

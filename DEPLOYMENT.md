@@ -73,20 +73,33 @@ docker compose -f docker-compose.prod.yml --env-file .env.production up -d --bui
 
 New migrations apply automatically when the backend starts. The backend shuts down gracefully (in about 1s) on `SIGTERM`. Connected browsers reconnect their WebSocket and rejoin open chats automatically. nginx resolves the backend at request time, so recreating the backend container never requires restarting `web`.
 
-### Backups (bundled database)
+### Backups
+
+The `backup` service backs up automatically: when the stack starts, then every `BACKUP_INTERVAL_HOURS` (default 24). Each run writes two files to `BACKUP_DIR` (default `./backups` next to the compose file):
+
+- `plugy-db-<time>.dump`: the database. Each dump is checked with `pg_restore --list` before it's kept.
+- `plugy-uploads-<time>.tgz`: profile photos, job photos and ID documents.
+
+Files older than `BACKUP_KEEP_DAYS` (default 14) are deleted. Check it's working with `docker compose -f docker-compose.prod.yml --env-file .env.production logs backup`.
+
+**Copy `BACKUP_DIR` off the server** (rclone, rsync or your provider's object storage). Backups on the same disk don't survive losing the server.
+
+**Restore** (stop the API first so nothing writes during the restore):
 
 ```bash
-docker compose -f docker-compose.prod.yml --env-file .env.production exec -T postgres \
-  pg_dump -U plugy -d plugy --format=custom > plugy-$(date +%F).dump
+COMPOSE="docker compose -f docker-compose.prod.yml --env-file .env.production"
+$COMPOSE stop backend web
+$COMPOSE exec -T postgres psql -U plugy -d postgres -c "DROP DATABASE plugy" -c "CREATE DATABASE plugy"
+$COMPOSE exec -T postgres pg_restore -U plugy -d plugy --no-owner < backups/plugy-db-<time>.dump
+docker run --rm -v plugy_prod_uploads:/data -v "$PWD/backups":/b alpine sh -c "rm -rf /data/* && tar xzf /b/plugy-uploads-<time>.tgz -C /data"
+$COMPOSE start backend web
 ```
 
-The data lives in the Docker volume `plugy_prod_pgdata`. Schedule the dump (cron) and copy it off the host.
+Practise a restore into a spare database now and then; a backup only counts if it restores.
 
-Photos and ID documents live in the volume `plugy_prod_uploads`; back it up alongside the database:
+### Continuous integration
 
-```bash
-docker run --rm -v plugy_prod_uploads:/data -v "$PWD":/backup alpine tar czf /backup/plugy-uploads-$(date +%F).tgz -C /data .
-```
+`.github/workflows/ci.yml` runs on every push and pull request: backend type-check, migrations and tests against a real PostgreSQL, the frontend build, both production image builds, and validation of `docker-compose.prod.yml`. Protect `main` on GitHub so pull requests need it to pass before merging.
 
 ---
 
@@ -215,6 +228,9 @@ Set these in `.env.production` (git-ignored). Never commit real values.
 | `JOB_OPEN_HOURS` | `72` | Hours before an unanswered "as soon as possible" request expires |
 | `ID_REQUIRED_CATEGORIES` | `babysitting,care_taking` | Kinds of work that need an approved ID to offer (empty to disable) |
 | `RATE_LIMIT_UPLOADS_MAX` | `40` | Photo uploads per IP per 15 minutes |
+| `CURRENCY` | `USD` | Currency for every price (ISO 4217 code, e.g. `ZAR`, `KES`, `ZWG`) |
+| `BACKUP_DIR` | `./backups` | Where the backup service writes database dumps and photo archives |
+| `BACKUP_INTERVAL_HOURS` / `BACKUP_KEEP_DAYS` | `24` / `14` | How often to back up, and how long to keep backups |
 | `UPLOAD_DIR` | `/data/uploads` (production image) | Where photos and ID documents are stored; mounted as the `uploads` volume |
 | `RUN_MIGRATIONS` | `true` | Run migrations on backend start. Set `false` if a release step runs `npm run migrate:up` |
 | `TWILIO_ACCOUNT_SID` / `TWILIO_AUTH_TOKEN` / `TWILIO_PHONE_NUMBER` | *(empty)* | SMS delivery (see §4) |

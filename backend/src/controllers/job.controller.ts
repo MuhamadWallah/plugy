@@ -748,6 +748,7 @@ export const releaseJob = async (req: Request, res: Response) => {
         `UPDATE job_offers SET status = 'withdrawn', updated_at = NOW() WHERE job_id = $1 AND worker_id = $2`,
         [ctx.id, ctx.userId]
       );
+      await client.query(`INSERT INTO job_releases (job_id, worker_id, reason) VALUES ($1, $2, $3)`, [ctx.id, ctx.userId, reason]);
 
       const restored = await client.query(
         `UPDATE job_offers SET status = 'pending', updated_at = NOW()

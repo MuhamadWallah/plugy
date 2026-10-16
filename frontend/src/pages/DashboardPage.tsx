@@ -5,6 +5,8 @@ import { ProfileSummary } from '../components/ProfileModal';
 import { NotificationSettings } from '../components/NotificationSettings';
 import { ProfilePhotoControl } from '../components/ProfilePhotoControl';
 import { VerificationCard } from '../components/VerificationCard';
+import { EarningsCard } from '../components/EarningsCard';
+import { AccountSettings } from '../components/AccountSettings';
 
 export const DashboardPage: React.FC = () => {
   const { user } = useAuth();
@@ -19,6 +21,8 @@ export const DashboardPage: React.FC = () => {
         <p className="text-xs text-slate-400 pt-2 border-t border-slate-800">This is what customers and workers see when they view your profile:</p>
         <ProfileSummary key={user.avatar_url ?? 'none'} userId={user.id} />
       </section>
+
+      <EarningsCard />
 
       <VerificationCard />
 
@@ -52,6 +56,8 @@ export const DashboardPage: React.FC = () => {
           Your phone number is shared only with the person you are matched with, after a worker is hired.
         </p>
       </section>
+
+      <AccountSettings />
 
       <section className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="p-5 rounded-3xl bg-slate-900/60 border border-slate-800/80 flex items-start gap-3.5">

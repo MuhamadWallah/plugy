@@ -1,8 +1,35 @@
+let currency = 'USD';
+// narrowSymbol: "$20.00" / "R20.00" everywhere, instead of locale variants like "US$20.00"
+const options = (code: string, short = false): Intl.NumberFormatOptions => ({
+  style: 'currency',
+  currency: code,
+  currencyDisplay: 'narrowSymbol',
+  ...(short ? { maximumFractionDigits: 0, minimumFractionDigits: 0 } : {}),
+});
+let fullFormat = new Intl.NumberFormat(undefined, options(currency));
+let shortFormat = new Intl.NumberFormat(undefined, options(currency, true));
+
+/** Sets the marketplace currency (ISO 4217 code from the server config) */
+export const setCurrency = (code: string | undefined) => {
+  if (!code || code === currency) return;
+  try {
+    fullFormat = new Intl.NumberFormat(undefined, options(code));
+    shortFormat = new Intl.NumberFormat(undefined, options(code, true));
+    currency = code;
+  } catch {
+    // unknown code: keep the previous currency
+  }
+};
+
+/** "$25.00" in the marketplace currency */
 export const formatMoney = (value: string | number | null | undefined): string | null => {
   if (value === null || value === undefined || value === '') return null;
   const n = Number(value);
-  return Number.isFinite(n) ? `$${n.toFixed(2)}` : null;
+  return Number.isFinite(n) ? fullFormat.format(n) : null;
 };
+
+/** "$25" (whole units) for compact places like map pins and quick-pick chips */
+export const formatMoneyShort = (value: string | number): string => shortFormat.format(Math.round(Number(value)));
 
 export const formatDistance = (km: number | null | undefined): string | null => {
   if (km === null || km === undefined || !Number.isFinite(km)) return null;
@@ -40,6 +67,15 @@ export const relativeTime = (iso: string | null | undefined): string => {
 export const memberSince = (iso: string | null | undefined): string => {
   if (!iso) return '';
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+};
+
+/**
+ * Share of hires a worker completed (vs backed out). Only meaningful after a few hires,
+ * so it returns null for newcomers.
+ */
+export const reliability = (jobsCompleted: number, backouts: number): number | null => {
+  const hires = jobsCompleted + backouts;
+  return hires >= 3 ? Math.round((jobsCompleted / hires) * 100) : null;
 };
 
 /** Reads `{ error }` from an API response, falling back to a generic message */

@@ -53,5 +53,8 @@ coverage/
 # Development Web Push keys (generated)
 .vapid-dev.json
 
+# Production backups written next to the compose file
+backups/
+
 # Uploaded photos and ID documents (development)
 backend/uploads/

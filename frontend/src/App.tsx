@@ -12,6 +12,8 @@ import { JobDetailModal } from './components/JobDetailModal';
 import { JobFeed } from './components/JobFeed';
 import { MyJobs } from './components/MyJobs';
 import { NotificationCenter } from './components/NotificationCenter';
+import { getAppConfig } from './utils/config';
+import { setCurrency } from './utils/format';
 
 function MainApp() {
   const { user, loading: authLoading } = useAuth();
@@ -19,6 +21,15 @@ function MainApp() {
   const [currentView, setCurrentView] = useState<NavView>('feed');
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [openInChat, setOpenInChat] = useState(false);
+  const [, setCurrencyReady] = useState(false);
+
+  // Prices use the marketplace currency from the server; re-render once it's known
+  useEffect(() => {
+    getAppConfig().then((c) => {
+      setCurrency(c.currency);
+      setCurrencyReady(true);
+    });
+  }, []);
 
   // Deep links from notifications: /?job=<id>[&tab=chat]
   const openFromUrl = useCallback((href: string) => {

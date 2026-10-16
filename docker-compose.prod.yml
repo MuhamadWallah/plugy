@@ -53,6 +53,7 @@ services:
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-mailto:support@plugy.app}
       ID_REQUIRED_CATEGORIES: ${ID_REQUIRED_CATEGORIES:-babysitting,care_taking}
+      CURRENCY: ${CURRENCY:-USD}
       UPLOAD_DIR: /data/uploads
       TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
       TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
@@ -60,6 +61,29 @@ services:
     volumes:
       # Profile/job photos and private ID documents: back this up with the database
       - uploads:/data/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # Scheduled backups of the database and uploads (see ops/backup.sh). Back up the bundled database;
+  # with a managed DATABASE_URL, use your provider's backups and keep this for uploads.
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    entrypoint: ["sh", "/ops/backup.sh"]
+    environment:
+      PGHOST: postgres
+      PGUSER: ${POSTGRES_USER:-plugy}
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB:-plugy}
+      BACKUP_INTERVAL_HOURS: ${BACKUP_INTERVAL_HOURS:-24}
+      BACKUP_KEEP_DAYS: ${BACKUP_KEEP_DAYS:-14}
+    volumes:
+      - ${BACKUP_DIR:-./backups}:/backups
+      - uploads:/uploads:ro
+      - ./ops:/ops:ro
     depends_on:
       postgres:
         condition: service_healthy

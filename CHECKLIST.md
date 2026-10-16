@@ -101,6 +101,10 @@ This checklist documents everything that has been built, what is intentionally s
 - [x] **Worker online mode:** workers pick the work they do, how far they travel and for how long (auto-off), then go online. New matching jobs within their distance are pushed to them (closest 50 per job), also when a job reopens; their location refreshes from GPS while Plugy is open and is never exposed. Their kinds of work show on their public profile.
 - [x] **Photos:** profile photos and up to 4 job photos (shown on feed cards and in the job, tap to enlarge). Images are shrunk on the phone before upload and re-encoded on the server, stripping metadata such as GPS.
 - [x] **ID verification:** workers submit an ID photo and a selfie; admins review them side by side and approve or reject with a reason. Approved workers carry an **ID verified** badge; babysitting and care jobs (`ID_REQUIRED_CATEGORIES`) take offers and send alerts only to verified workers. ID files are private (admins only).
+- [x] **Account settings:** change name, change password (signs out other devices), and **delete account**. Deletion removes personal data, photos and ID documents, withdraws open requests and offers, and keeps past jobs, messages and reviews for the other people under "Deleted user". It's blocked while a job is in progress.
+- [x] **Reliability and earnings:** every worker back-out is recorded; profiles and offers show "% of hires completed" once a worker has 3+ hires. Workers see earnings for the week, the month and all time, plus recent jobs.
+- [x] **Currency:** all prices use `CURRENCY` (ISO code) with a consistent symbol, in the app and in notifications.
+- [x] **Operations:** GitHub Actions CI (tests on PostgreSQL, builds, production images); scheduled backups of the database and photos with dump verification and retention; restore steps documented.
 - [x] **Moderation:** admins (`ADMIN_EMAILS`) review reports, dismiss or suspend. Suspension blocks sign-in and live connections and takes the user's open jobs and offers off the market; reinstatement supported.
 
 ---
@@ -124,7 +128,7 @@ Before scaling to public commercial users, the following items are simplified or
 
 ## 3. Manual Testing Checklist (Before Showing to Real Users)
 
-The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow, 18/18 for scheduling, safety, password reset, moderation and push, 8/8 for worker online mode and 14/14 for photos and ID verification against the dev stack; the hiring flow, photos/ID verification and push subscription also pass against the production stack.
+The same flows are automated in real-browser tests (customer on desktop, worker on a phone-sized screen): 27/27 checks for the hiring flow, 18/18 for scheduling, safety, password reset, moderation and push, 8/8 for worker online mode, 14/14 for photos and ID verification and 11/11 for account settings against the dev stack; the hiring flow, photos/ID verification, account settings and push subscription also pass against the production stack, and a production backup was restored into a fresh database with identical row counts.
 
 Open two browser windows (Window 1: normal, Window 2: incognito). Location features need `http://localhost` or HTTPS; allow location access when asked.
 
@@ -173,7 +177,12 @@ Open two browser windows (Window 1: normal, Window 2: incognito). Location featu
 3. As an unverified worker, the babysitting card says **Verify ID to offer** and leads to **ID verification**. Submit an ID photo and a selfie.
 4. As an admin, open **Reports → ID checks**, compare the photos and **Approve**. The worker is notified and can now offer; the customer sees the **ID verified** badge on the offer.
 
-### Test 9: Things going wrong
+### Test 9: Account settings
+1. On **My profile**, change your name and password. A device you signed in on beforehand gets signed out.
+2. As a worker with completed jobs, check **Your earnings** and the "% of hires completed" on your profile.
+3. **Delete my account** (with your password): you're signed out, can't sign in again, and your profile shows as deleted. The other person's reviews remain.
+
+### Test 10: Things going wrong
 1. Hire Worker B on a new job, then in Worker B's window choose **I can't do this job** with a reason. Customer A is told why, the job is open again, and earlier offers are restored.
 2. Cancel a job from the customer side with a reason; workers who made offers are notified.
 3. Use **Report** on the other party and pick a reason; a second report within 24 hours is refused.

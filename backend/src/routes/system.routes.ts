@@ -15,6 +15,7 @@ configRouter.get('/', (_req: Request, res: Response) => {
     emergencyNumber: env.EMERGENCY_NUMBER,
     pushPublicKey: getPushPublicKey(),
     idRequiredCategories: env.ID_REQUIRED_CATEGORIES,
+    currency: env.CURRENCY,
   });
 });
 

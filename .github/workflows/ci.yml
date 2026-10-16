@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: plugy
+          POSTGRES_PASSWORD: plugy_secret
+          POSTGRES_DB: plugy
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U plugy -d plugy"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgres://plugy:plugy_secret@localhost:5432/plugy
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+      - run: npm ci
+      - name: Type-check
+        run: npx tsc --noEmit -p .
+      - name: Apply migrations
+        run: npm run migrate:up
+      - name: Run tests
+        run: npm test
+
+  frontend:
+    name: Frontend build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - name: Type-check and build
+        run: npm run build
+
+  docker:
+    name: Production images
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build backend image
+        run: docker build --target production -t plugy-backend:ci ./backend
+      - name: Build web image
+        run: docker build --target production -t plugy-web:ci ./frontend
+      - name: Validate production compose file
+        run: |
+          printf 'PUBLIC_URL=https://ci.example\nJWT_SECRET=%s\nPOSTGRES_PASSWORD=ci\n' "$(openssl rand -hex 32)" > ci.env
+          docker compose -f docker-compose.prod.yml --env-file ci.env config -q
